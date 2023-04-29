@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>translations/ch341pgr_en.qm</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,29 @@
+此驱动是沁恒CH341系列芯片的linux驱动，是在官方驱动的基础上做了些改动得来，
+(官方驱动代码太老了，许多变量类型在新发行版、新内核中已做了升级，造成编译不通过)
+原驱动请到 WCH 的官网（ www.wch.cn ）下载。
+再次申明，此驱动并不是编程器的一部分，驱动的版权仍属于原作者。编译编程器程序并不需要该驱动，
+放在此处只是为了方便使用者使用编程器程序。
+
+
+编译与使用
+
+1、安装内核头文件和开发包（使用相应的版本号替换 xx,例如我的就是 kernel-devel-5.14.10）
+    sudo yum install kernel-headers kernel-devel-xx.xx.xx
+    开发包的版本号必须与系统使用的版本号一致（可使用命令 uname -r 查看）
+
+2、编译（先用 cd 命令切换到 driver 目录，以后操作也是一样，
+    加载、卸载都要先切换到相应目录）
+    make
+
+3、加载驱动
+    sudo make load
+     (可选操作)加载驱动前“删除”(更名为其他名字如“ch341.ko.xz.bak”即可，
+     需要时(使用ch340串口)再更名回来)系统原驱动，以避免插入硬件时自动加载。
+     （/lib/modules/xx.xx.xx-xxx.fc35.x86_64/kernel/drivers/usb/serial/ch341.ko.xz）
+     看到终端打印以下两行信息表明驱动加载成功
+    modprobe usbserial
+    insmod ch34x_pis.ko
+    
+4、卸载驱动
+    sudo make unload
+
