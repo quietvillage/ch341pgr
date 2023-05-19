@@ -224,13 +224,17 @@ void MainWindow::on_btn_erase_clicked()
         return;
     }
 
-    if(m_port.spiErase()) {
+    ui->statusbar->showMessage(tr("请稍后..."));
+    ui->statusbar->repaint();
+
+    if(m_port.spiEraseChip()) {
         QMessageBox::information(this, tr("提示"), tr("擦除完成"), tr("确定"));
     }else {
         QMessageBox::critical(this, tr("错误"), tr("擦除失败"), tr("确定"));
     }
 
     m_port.closeDevice();
+    ui->statusbar->showMessage("");
 }
 
 //返回 0 - 未指定型号
@@ -293,6 +297,7 @@ void MainWindow::on_btn_checkEmpty_clicked()
     ui->progressBar->setVisible(true);
     this->blockActions(true);
 
+    int errCount = 0;
     i = 0;
     while (i < size) {
         if (size - i < step) {
@@ -300,6 +305,8 @@ void MainWindow::on_btn_checkEmpty_clicked()
         }
         stepData = m_port.read(step, i);
         if (stepData.length() != step) {
+            ++errCount;
+            if (errCount < 5) {continue;} //连续 5 次出错
             QMessageBox::critical(this, tr("错误"), m_port.errorMessage(Ch341Interface::ReadError), tr("确定"));
             goto final;
         }
@@ -312,6 +319,7 @@ void MainWindow::on_btn_checkEmpty_clicked()
             }
         }
 
+        errCount = 0;
         i += step;
         ui->progressBar->setValue(i * 100 / size);
         QApplication::processEvents();
@@ -348,6 +356,7 @@ void MainWindow::on_btn_read_clicked()
     ui->progressBar->setVisible(true);
     this->blockActions(true);
 
+    int errCount = 0;
     i = 0;
     while (i < size) {
         if (size - i < step) {
@@ -355,10 +364,14 @@ void MainWindow::on_btn_read_clicked()
         }
         stepData = m_port.read(step, i);
         if (stepData.length() != step) {
+            ++errCount;
+            if (errCount < 5) {continue;}
             QMessageBox::critical(this, tr("错误"), m_port.errorMessage(Ch341Interface::ReadError), tr("确定"));
             m_buffer = m_buffer.left(len);
             goto final;
         }
+
+        errCount = 0;
         m_buffer += stepData;
         i += step;
         ui->progressBar->setValue(i * 100 / size);
@@ -382,7 +395,7 @@ void MainWindow::on_btn_write_clicked()
         return;
     }
 
-    int size, step = CH341_MAX_BUF_LEN;
+    int size, step = CH341_MAX_BUF_LEN; // CH341_MAX_BUF_LEN = sector size = 4KB
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
@@ -407,6 +420,7 @@ void MainWindow::on_btn_write_clicked()
     ui->progressBar->setVisible(true);
     this->blockActions(true);
 
+    int errCount = 0;
     i = 0;
     while (i < size) {
         if (step > size - i) {
@@ -415,10 +429,16 @@ void MainWindow::on_btn_write_clicked()
 
         sub = m_port.write(m_buffer.mid(i, step), i);
         if (sub != step) {
+            ++errCount;
+            if (errCount < 5) {
+                m_port.spiEraseSector(i); // step = CH341_MAX_BUF_LEN = sector size = 4KB
+                continue;
+            }
             QMessageBox::critical(this, tr("错误"), m_port.errorMessage(-sub), tr("确定"));
             goto final;
         }
 
+        errCount = 0;
         i += step;
         ui->progressBar->setValue(i * 100 / size);
         QApplication::processEvents();
@@ -464,6 +484,7 @@ void MainWindow::on_btn_check_clicked()
     ui->progressBar->setVisible(true);
     this->blockActions(true);
 
+    int errCount = 0;
     i = 0;
     while (i < len) {
         if (len - i < step) {
@@ -471,6 +492,8 @@ void MainWindow::on_btn_check_clicked()
         }
         stepData = m_port.read(step, i);
         if (stepData.length() != step) {
+            ++errCount;
+            if (errCount < 5) {continue;}
             QMessageBox::critical(this, tr("错误"), m_port.errorMessage(Ch341Interface::ReadError), tr("确定"));
             goto final;
         }
@@ -480,6 +503,7 @@ void MainWindow::on_btn_check_clicked()
             goto final;
         }
 
+        errCount = 0;
         i += step;
         ui->progressBar->setValue(i * 100 / size);
         QApplication::processEvents();
@@ -491,6 +515,8 @@ void MainWindow::on_btn_check_clicked()
         }
         stepData = m_port.read(step, i);
         if (stepData.length() != step) {
+            ++errCount;
+            if (errCount < 5) {continue;}
             QMessageBox::critical(this, tr("错误"), m_port.errorMessage(Ch341Interface::ReadError), tr("确定"));
             goto final;
         }
@@ -503,6 +529,7 @@ void MainWindow::on_btn_check_clicked()
             }
         }
 
+        errCount = 0;
         i += step;
         ui->progressBar->setValue(i * 100 / size);
         QApplication::processEvents();

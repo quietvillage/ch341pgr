@@ -81,7 +81,8 @@ public:
 
     void spiSetCS(uchar cs) {m_spiCS = 0x80 | (cs & 0x03);}
     QByteArray spiJedecId();
-    bool spiErase();
+    bool spiEraseChip();
+    bool spiEraseSector(uint addr);
     bool spiReset();
     char i2cCurrentByte();
 

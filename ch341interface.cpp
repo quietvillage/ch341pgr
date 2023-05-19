@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
-#include <QElapsedTimer>
 #include <QFileInfo>
 
 static
@@ -313,10 +312,10 @@ QByteArray Ch341Interface::spiReadPrivate(uint n, uint addr)
 {
     QByteArray buf;
 
-    buf.append(SPI_CMD_READ_DATA);
-    buf.append(addr >> 16);
-    buf.append(addr >> 8);
-    buf.append(addr);
+    buf.append(SPI_CMD_READ_DATA); //cmd
+    buf.append(addr >> 16); //addr23 - 16
+    buf.append(addr >> 8); //addr15 - 8
+    buf.append(addr); //addr7 - 0
     buf.resize(n + 4); //can be any value
 
     buf = spiStreamPrivate(buf, OPERATION_SPI_STREAM_READ);
@@ -359,9 +358,8 @@ bool Ch341Interface::spiWriteEnablePrivate()
 bool Ch341Interface::spiWaitPrivate()
 {
     QByteArray buf;
-    QElapsedTimer timer;
-    timer.start();
-    while (timer.elapsed() < 1000) {
+
+    while (1) {
         buf = spiGetStatusPrivate(SPI_CMD_READ_SR);
 
         if (!buf.length()) {
@@ -376,7 +374,7 @@ bool Ch341Interface::spiWaitPrivate()
     return false;
 }
 
-bool Ch341Interface::spiErase()
+bool Ch341Interface::spiEraseChip()
 {
    if (!spiWriteEnablePrivate()) {return false;}
    QByteArray buf;
@@ -388,6 +386,23 @@ bool Ch341Interface::spiErase()
    }
 
    return spiWaitPrivate();
+}
+
+bool Ch341Interface::spiEraseSector(uint addr)
+{
+    if (!spiWriteEnablePrivate()) {return false;}
+    QByteArray buf;
+    buf.append(SPI_CMD_ERASE_4KB);
+    buf.append(addr >> 16);
+    buf.append(addr >> 8);
+    buf.append(addr);
+
+    if (!spiStreamPrivate(buf, OPERATION_SPI_STREAM_WRITE).length()) {
+        m_error = WriteError;
+        return false;
+    }
+
+    return spiWaitPrivate();
 }
 
 bool Ch341Interface::spiReset()
@@ -416,7 +431,12 @@ bool Ch341Interface::spiPageProgramPrivate(const QByteArray &in, uint addr)
     buf.append(addr);
     buf += in;
 
-    return spiStreamPrivate(buf, OPERATION_SPI_STREAM_WRITE).length();
+    if (!spiStreamPrivate(buf, OPERATION_SPI_STREAM_WRITE).length()) {
+        m_error = WriteError;
+        return false;
+    }
+
+    return spiWaitPrivate();
 }
 
 int Ch341Interface::spiWritePrivate(const QByteArray &in, uint addr)
@@ -436,6 +456,7 @@ int Ch341Interface::spiWritePrivate(const QByteArray &in, uint addr)
     sum += step;
     len -= step;
     i += step;
+    addr += step;
     step = SPI_MAX_PAGE_PRAGRAM_SIZE;
 
     while (len) {
@@ -450,6 +471,7 @@ int Ch341Interface::spiWritePrivate(const QByteArray &in, uint addr)
 
         sum += step;
         i += step;
+        addr += step;
         len -= step;
     }
 
