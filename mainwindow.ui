@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
+    <width>880</width>
     <height>600</height>
    </rect>
   </property>
@@ -17,9 +17,9 @@
    <widget class="QWidget" name="horizontalLayoutWidget">
     <property name="geometry">
      <rect>
-      <x>10</x>
+      <x>50</x>
       <y>10</y>
-      <width>656</width>
+      <width>658</width>
       <height>401</height>
      </rect>
     </property>
@@ -270,30 +270,15 @@
       </widget>
      </item>
      <item>
-      <layout class="QVBoxLayout" name="verticalLayout">
+      <layout class="QVBoxLayout" name="vLayout">
        <property name="spacing">
         <number>15</number>
        </property>
        <property name="topMargin">
         <number>10</number>
        </property>
-       <property name="bottomMargin">
-        <number>10</number>
-       </property>
        <item>
-        <widget class="QPlainTextEdit" name="plainTextEdit">
-         <property name="font">
-          <font>
-           <family>Source Code Pro</family>
-          </font>
-         </property>
-         <property name="lineWrapMode">
-          <enum>QPlainTextEdit::NoWrap</enum>
-         </property>
-         <property name="readOnly">
-          <bool>true</bool>
-         </property>
-        </widget>
+        <widget class="HexView" name="hexView" native="true"/>
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -379,7 +364,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>880</width>
      <height>25</height>
     </rect>
    </property>
@@ -458,6 +443,14 @@
    </property>
   </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>HexView</class>
+   <extends>QWidget</extends>
+   <header>hexview.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

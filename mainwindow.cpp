@@ -4,6 +4,8 @@
 
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QScrollBar>
+#include <QTextBlock>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -16,7 +18,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_translator.load(":translations/ch341pgr_en.qm");
 
     ui->centralwidget->setLayout(ui->hLayout);
-    ui->progressBar->setParent(ui->plainTextEdit);
+    ui->progressBar->setParent(ui->hexView);
     ui->progressBar->setVisible(false);
 
     connect(ui->btn_open, SIGNAL(clicked()), this, SLOT(on_action_open_triggered()));
@@ -32,8 +34,8 @@ MainWindow::~MainWindow()
 
 void MainWindow::resizeEvent(QResizeEvent *e)
 {
-    ui->progressBar->move((ui->plainTextEdit->width() - ui->progressBar->width()) >> 1,
-                          (ui->plainTextEdit->height() - ui->progressBar->height()) >> 1);
+    ui->progressBar->move((ui->hexView->width() - ui->progressBar->width()) >> 1,
+                          (ui->hexView->height() - ui->progressBar->height()) >> 1);
 
     if (e != nullptr) {
         e->ignore();
@@ -43,41 +45,6 @@ void MainWindow::resizeEvent(QResizeEvent *e)
 void MainWindow::onloaded()
 {
     this->resizeEvent(nullptr);
-}
-
-void MainWindow::displayBufferData()
-{
-    if (!m_buffer.length()) {
-        ui->plainTextEdit->clear();
-        return;
-    }
-
-    uint i = 0, len = m_buffer.length();
-    QString text = "00000000:", ascii;
-
-    for (; i < len; ++i) {
-        if (i && !(i & 0x0F)) {
-            text += " |" + ascii + "|";
-            ascii = "";
-            text += QString("\n%1:").arg(i, 8, 16, QLatin1Char('0'));
-        }
-
-        text += QString(" %1").arg((uchar)m_buffer.at(i), 2, 16, QLatin1Char('0'));
-        if ((uchar)m_buffer.at(i) < ' '
-           || ((uchar)m_buffer.at(i) >= 0x7F && (uchar)m_buffer.at(i) <= 0xA0)
-           || (uchar)m_buffer.at(i) == 0xAD)
-        {
-            ascii += '\x01';
-        } else {
-            ascii += m_buffer.at(i);
-        }
-    }
-
-    if ((len = ascii.length())) {
-        text += QString("%1 |%2|").arg(QString((16 - len) * 3, ' '), ascii);
-    }
-
-    ui->plainTextEdit->setPlainText(text);
 }
 
 void MainWindow::on_action_open_triggered()
@@ -91,9 +58,8 @@ void MainWindow::on_action_open_triggered()
         return;
     }
 
-    m_buffer = file.readAll();
+    ui->hexView->setData(file.readAll());
     file.close();
-    this->displayBufferData();
     m_file = fileName;
     ui->statusbar->showMessage(tr("已选择文件“%1”").arg(m_file), 3000);
 }
@@ -101,7 +67,7 @@ void MainWindow::on_action_open_triggered()
 
 void MainWindow::on_action_save_triggered()
 {
-    if (!m_buffer.length()) {
+    if (!ui->hexView->data().length()) {
         QMessageBox::information(this, tr("提示"), tr("缓冲区没有内容"), tr("确定"));
         return;
     }
@@ -116,7 +82,9 @@ void MainWindow::on_action_save_triggered()
         return;
     }
 
-    file.write(m_buffer);
+    ui->hexView->setBusy(true);
+    file.write(ui->hexView->data());
+    ui->hexView->setBusy(false);
     file.close();
     QMessageBox::information(this, tr("提示"), tr("保存完成"), tr("确定"));
 }
@@ -336,7 +304,8 @@ final:
 
 void MainWindow::on_btn_read_clicked()
 {
-    int size, step = CH341_DEFAULT_BUF_LEN, len = m_buffer.length();
+    QByteArray buffer;
+    int size, step = CH341_DEFAULT_BUF_LEN;
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
@@ -367,19 +336,17 @@ void MainWindow::on_btn_read_clicked()
             ++errCount;
             if (errCount < 5) {continue;}
             QMessageBox::critical(this, tr("错误"), m_port.errorMessage(Ch341Interface::ReadError), tr("确定"));
-            m_buffer = m_buffer.left(len);
             goto final;
         }
 
         errCount = 0;
-        m_buffer += stepData;
+        buffer += stepData;
         i += step;
         ui->progressBar->setValue(i * 100 / size);
         QApplication::processEvents();
     }
 
-    m_buffer = m_buffer.mid(len);
-    this->displayBufferData();
+    ui->hexView->setData(buffer);
 
 final:
     m_port.closeDevice();
@@ -390,7 +357,7 @@ final:
 
 void MainWindow::on_btn_write_clicked()
 {
-    if (!m_buffer.length()) {
+    if (!ui->hexView->data().length()) {
         QMessageBox::information(this, tr("提示"), tr("缓冲区没有内容"), tr("确定"));
         return;
     }
@@ -405,11 +372,11 @@ void MainWindow::on_btn_write_clicked()
         return;
     }
 
-    if (m_buffer.length() > size) {
+    if (ui->hexView->data().length() > size) {
         i = QMessageBox::question(this, tr("确认"), tr("缓冲区长度已超过存储器容量，超过部分将被直接丢弃，是否继续"), tr("否"), tr("是"));
         if (0 == i) {return;}
     }else {
-        size = m_buffer.length();
+        size = ui->hexView->data().length();
     }
 
     if (ui->combo_memType->currentIndex()) {
@@ -418,6 +385,7 @@ void MainWindow::on_btn_write_clicked()
 
     ui->progressBar->setValue(0);
     ui->progressBar->setVisible(true);
+    ui->hexView->setBusy(true);
     this->blockActions(true);
 
     int errCount = 0;
@@ -427,7 +395,7 @@ void MainWindow::on_btn_write_clicked()
             step = size - i;
         }
 
-        sub = m_port.write(m_buffer.mid(i, step), i);
+        sub = m_port.write(ui->hexView->data().mid(i, step), i);
         if (sub != step) {
             ++errCount;
             if (errCount < 5) {
@@ -445,27 +413,27 @@ void MainWindow::on_btn_write_clicked()
     }
 
     QMessageBox::information(this, tr("提示"), tr("写入完成"), tr("确定"));
-    if (m_buffer.length() > size) {
-        m_buffer = m_buffer.left(size);
-        this->displayBufferData();
+    if (ui->hexView->data().length() > size) {
+        ui->hexView->setData(ui->hexView->data().left(size));
     }
 
 final:
     m_port.closeDevice();
     ui->progressBar->setVisible(false);
+    ui->hexView->setBusy(false);
     this->blockActions(false);
 }
 
 
 void MainWindow::on_btn_check_clicked()
 {
-    if (!m_buffer.length()) {
+    if (!ui->hexView->data().length()) {
         QMessageBox::information(this, tr("提示"), tr("缓冲区没有内容"), tr("确定"));
         return;
     }
 
     m_port.setPortName(ui->combo_ports->currentText());
-    int size, step = CH341_DEFAULT_BUF_LEN, len = m_buffer.length();
+    int size, step = CH341_DEFAULT_BUF_LEN, len = ui->hexView->data().length();
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
@@ -482,6 +450,7 @@ void MainWindow::on_btn_check_clicked()
     QByteArray stepData;
     ui->progressBar->setValue(0);
     ui->progressBar->setVisible(true);
+    ui->hexView->setBusy(true);
     this->blockActions(true);
 
     int errCount = 0;
@@ -498,7 +467,7 @@ void MainWindow::on_btn_check_clicked()
             goto final;
         }
 
-        if (stepData != m_buffer.mid(i, step)) {
+        if (stepData != ui->hexView->data().mid(i, step)) {
             QMessageBox::critical(this, tr("提示"), tr("校验内容不一致"), tr("确定"));
             goto final;
         }
@@ -509,6 +478,7 @@ void MainWindow::on_btn_check_clicked()
         QApplication::processEvents();
     }
 
+    //校验多出的空间是否为空
     while (i < size) {
         if (size - i < step) {
             step = size - i;
@@ -540,6 +510,7 @@ void MainWindow::on_btn_check_clicked()
 final:
     m_port.closeDevice();
     ui->progressBar->setVisible(false);
+    ui->hexView->setBusy(false);
     this->blockActions(false);
 }
 

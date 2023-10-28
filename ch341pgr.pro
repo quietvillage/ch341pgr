@@ -4,6 +4,8 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
 
+QMAKE_LFLAGS += -no-pie
+
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
@@ -11,12 +13,14 @@ CONFIG += c++17
 SOURCES += \
     ch341interface.cpp \
     chipdata.cpp \
+    hexview.cpp \
     main.cpp \
     mainwindow.cpp
 
 HEADERS += \
     ch341interface.h \
     chipdata.h \
+    hexview.h \
     mainwindow.h
 
 FORMS += \

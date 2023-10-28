@@ -56,13 +56,11 @@ private slots:
 private:
     int chipSize();
     void initModel();
-    void displayBufferData();
     void blockActions(bool block);
 
     Ui::MainWindow *ui;
     QTranslator m_translator;
     Ch341Interface m_port;
-    QByteArray m_buffer; //缓存数据
     QString m_file;
 };
 #endif // MAINWINDOW_H
