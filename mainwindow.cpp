@@ -10,8 +10,10 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
+    , m_croppingDialog(nullptr)
 {
     ui->setupUi(this);
+    this->setWindowIcon(QIcon(":logo.png"));
 
     this->on_btn_flush_clicked();
     this->onMemTypeChanged(0);
@@ -23,6 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->btn_open, SIGNAL(clicked()), this, SLOT(on_action_open_triggered()));
     connect(ui->btn_save, SIGNAL(clicked()), this, SLOT(on_action_save_triggered()));
+    connect(ui->btn_cropping, SIGNAL(clicked()), this, SLOT(on_action_cropping_triggered()));
     connect(ui->combo_memType, SIGNAL(currentIndexChanged(int)), this, SLOT(onMemTypeChanged(int)));
     connect(ui->combo_ports, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(onPortChanged(const QString &)));
 }
@@ -30,6 +33,7 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     delete ui;
+    delete m_croppingDialog;
 }
 
 void MainWindow::resizeEvent(QResizeEvent *e)
@@ -162,22 +166,6 @@ void MainWindow::on_btn_detect_clicked()
     m_port.closeDevice();
 }
 
-void MainWindow::on_btn_reset_clicked()
-{
-    if (!m_port.openDevice()) {
-        QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
-        return;
-    }
-
-    if (!ui->combo_memType->currentIndex()) {
-        m_port.spiReset();
-    }
-
-    m_port.closeDevice();
-    ui->statusbar->showMessage(tr("复位完成"), 2000);
-}
-
-
 void MainWindow::on_btn_erase_clicked()
 {
     if (ui->combo_memType->currentIndex()) {
@@ -239,7 +227,6 @@ void MainWindow::blockActions(bool block)
     ui->btn_checkEmpty->setEnabled(block);
     ui->btn_check->setEnabled(block);
     ui->btn_detect->setEnabled(block);
-    ui->btn_reset->setEnabled(block);
     ui->btn_open->setEnabled(block);
     ui->action_open->setEnabled(block);
 }
@@ -539,5 +526,44 @@ void MainWindow::on_action_select_en_triggered()
 {
     QApplication::installTranslator(&m_translator);
     ui->retranslateUi(this);
+}
+
+
+void MainWindow::on_action_cropping_triggered()
+{
+    int len = ui->hexView->data().length();
+    if (!len) {
+        QMessageBox::information(this, tr("提示"), tr("缓冲区没有数据，无法裁剪"), tr("确定"));
+        return;
+    }
+    if (nullptr == m_croppingDialog) {
+        m_croppingDialog = new CroppingDialog(this);
+        connect(m_croppingDialog, SIGNAL(chop(char)), this, SLOT(onChopRequest(char)));
+        connect(m_croppingDialog, SIGNAL(cropping(int, int)), this, SLOT(onCroppingRequest(int, int)));
+    }
+
+    m_croppingDialog->setStartIndex(0);
+    m_croppingDialog->setEndIndex(len - 1);
+    m_croppingDialog->setMaximum(len - 1);
+    m_croppingDialog->show();
+}
+
+void MainWindow::onChopRequest(char ch)
+{
+    int i = ui->hexView->data().length() - 1;
+    while (i >= 0 && ui->hexView->data().at(i) == ch) {
+        --i;
+    }
+
+    m_croppingDialog->setEndIndex(i);
+}
+
+void MainWindow::onCroppingRequest(int start, int end)
+{
+    if (end < start) {
+        ui->hexView->setData(QByteArray());
+    }else {
+        ui->hexView->setData(ui->hexView->data().mid(start, end - start + 1));
+    }
 }
 

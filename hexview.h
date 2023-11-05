@@ -13,7 +13,6 @@ class HexView : public QAbstractScrollArea
     Q_OBJECT
 public:
     explicit HexView(QWidget *parent = nullptr);
-    ~HexView();
 
     QByteArray &data() {return m_data;}
     void setData(const QByteArray &data);

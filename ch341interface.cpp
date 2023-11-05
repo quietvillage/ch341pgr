@@ -75,6 +75,11 @@ bool Ch341Interface::openDevice()
 
     this->vendorId(); //初始化 vendorIc 后才能正常使用
 
+    if (m_vendorIc < 0x20) {
+        m_error = UnsupportedOperationError;
+        return false;
+    }
+
     m_error = NoError;
     return true;
 }
@@ -485,7 +490,7 @@ QByteArray Ch341Interface::i2cReadPrivate(uint n, uint addr, uchar addrSize)
         m_error = UnsupportedOperationError;
         return "";
     }
-    m_streamMode = 0x01;
+
     char outBuf[CH341_MAX_BUF_LEN];
     QByteArray inBuf;
     unsigned long retLen, data[4];

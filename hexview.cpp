@@ -40,10 +40,6 @@ HexView::HexView(QWidget *parent)
     connect(m_edit, SIGNAL(editingFinished()), this, SLOT(onEditingFinished()));
 }
 
-HexView::~HexView()
-{
-    delete m_edit;
-}
 
 void HexView::paintEvent(QPaintEvent *)
 {
@@ -76,7 +72,7 @@ void HexView::paintEvent(QPaintEvent *)
            || ((uchar)m_data.at(i) >= 0x7F && (uchar)m_data.at(i) <= 0xA0)
            || (uchar)m_data.at(i) == 0xAD)
         {
-            ascii += '\x01';
+            ascii += "\u25A1";
         } else {
             ascii += m_data.at(i);
         }

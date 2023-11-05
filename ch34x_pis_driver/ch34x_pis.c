@@ -21,7 +21,7 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/kref.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 
@@ -32,7 +32,7 @@
 #define KERNEL_VERSION(ver, rel, seq) 	((ver << 16) | (rel <<8) | (seq))
 #endif
 
-#define DEBUG
+//#define DEBUG
 //#undef DEBUG
 
 #ifdef DEBUG
@@ -190,9 +190,20 @@ static int ch34x_func_read( __u8 request, __u16 value, __u16 index,
 {
 	int retval;
 	/*Control Transform -->usb_control_msg */
-	retval = usb_control_msg( dev->udev, usb_rcvctrlpipe( dev->udev, 0 ), 
-		request, VENDOR_READ_TYPE, value, index, buf, len, 1000);
 
+    //内核 >= 4.9 不再接受任何静态分配的缓冲区
+    unsigned char* data = kmalloc(len, GFP_KERNEL);
+    if (NULL == data) {
+        return -ENOMEM;
+    }
+    retval = usb_control_msg( dev->udev, usb_rcvctrlpipe( dev->udev, 0 ), 
+        request, VENDOR_READ_TYPE, value, index, data, len, 1000);
+
+    while (len-- > 0) {
+        buf[len] = data[len];
+    }
+    
+    kfree(data);
 	dbg( "VENDOR_READ_TYPE: 0x%x : 0x%x : 0x%x %d - %d", request,
 		value, index, retval, len );
 
@@ -319,7 +330,7 @@ ssize_t ch34x_fops_read(struct file *file, char __user *to_user,
 		}
 		mutex_lock( &io_mutex );
 		retval = usb_bulk_msg( dev->udev, usb_sndbulkpipe( dev->udev, 
-			dev->bulk_out_endpointAddr ), mBuffer + j, 0x02, NULL, 10000);
+			dev->bulk_out_endpointAddr ), mBuffer + j, 0x02, NULL, 1000);
 		if( retval )
 		{
 			retval = -EFAULT;
@@ -751,7 +762,7 @@ static int ch34x_data_write_read( unsigned long iLength, unsigned long iBuffer,
 		mutex_lock( &io_mutex );
 		retval = usb_bulk_msg( dev->udev,
 				usb_rcvbulkpipe( dev->udev, dev->bulk_in_endpointAddr),
-				oBuf + i * CH34x_EPP_IO_MAX, CH34x_EPP_IO_MAX, &bytes_read, 10000);
+				oBuf + i * CH34x_EPP_IO_MAX, CH34x_EPP_IO_MAX, &bytes_read, 100);
 
 		totallen += bytes_read;
 		mutex_unlock( &io_mutex );

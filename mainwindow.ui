@@ -241,19 +241,6 @@
          <string>刷新端口</string>
         </property>
        </widget>
-       <widget class="QPushButton" name="btn_reset">
-        <property name="geometry">
-         <rect>
-          <x>0</x>
-          <y>370</y>
-          <width>71</width>
-          <height>28</height>
-         </rect>
-        </property>
-        <property name="text">
-         <string>复位芯片</string>
-        </property>
-       </widget>
        <widget class="QLabel" name="label_code">
         <property name="geometry">
          <rect>
@@ -265,6 +252,22 @@
         </property>
         <property name="text">
          <string/>
+        </property>
+       </widget>
+       <widget class="QPushButton" name="btn_cropping">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="geometry">
+         <rect>
+          <x>80</x>
+          <y>370</y>
+          <width>71</width>
+          <height>28</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>裁剪</string>
         </property>
        </widget>
       </widget>
@@ -374,6 +377,7 @@
     </property>
     <addaction name="action_open"/>
     <addaction name="action_save"/>
+    <addaction name="action_cropping"/>
     <addaction name="action_quit"/>
    </widget>
    <widget class="QMenu" name="menu_L">
@@ -395,7 +399,7 @@
     <string>打开(&amp;O)</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+O</string>
+    <string notr="true">Ctrl+O</string>
    </property>
   </action>
   <action name="action_save">
@@ -406,7 +410,7 @@
     <string>保存(&amp;S)</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+S</string>
+    <string notr="true">Ctrl+S</string>
    </property>
   </action>
   <action name="action_quit">
@@ -417,7 +421,7 @@
     <string>退出</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+Q</string>
+    <string notr="true">Ctrl+Q</string>
    </property>
   </action>
   <action name="action_select_zh_CN">
@@ -440,6 +444,11 @@
    </property>
    <property name="toolTip">
     <string notr="true">English</string>
+   </property>
+  </action>
+  <action name="action_cropping">
+   <property name="text">
+    <string>裁剪</string>
    </property>
   </action>
  </widget>

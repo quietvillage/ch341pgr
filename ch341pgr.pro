@@ -13,6 +13,7 @@ QMAKE_LFLAGS += -no-pie
 SOURCES += \
     ch341interface.cpp \
     chipdata.cpp \
+    croppingdialog.cpp \
     hexview.cpp \
     main.cpp \
     mainwindow.cpp
@@ -20,10 +21,12 @@ SOURCES += \
 HEADERS += \
     ch341interface.h \
     chipdata.h \
+    croppingdialog.h \
     hexview.h \
     mainwindow.h
 
 FORMS += \
+    croppingdialog.ui \
     mainwindow.ui
 
 TRANSLATIONS += \

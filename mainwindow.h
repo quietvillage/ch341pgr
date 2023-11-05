@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include "ch341interface.h"
+#include "croppingdialog.h"
 #include <QMainWindow>
 #include <QTranslator>
 
@@ -45,13 +46,15 @@ private slots:
 
     void on_btn_detect_clicked();
 
-    void on_btn_reset_clicked();
-
     void onPortChanged(const QString &port);
 
     void on_action_select_zh_CN_triggered();
 
     void on_action_select_en_triggered();
+
+    void on_action_cropping_triggered();
+    void onChopRequest(char); //删除尾部特定值
+    void onCroppingRequest(int, int);
 
 private:
     int chipSize();
@@ -59,6 +62,7 @@ private:
     void blockActions(bool block);
 
     Ui::MainWindow *ui;
+    CroppingDialog *m_croppingDialog;
     QTranslator m_translator;
     Ch341Interface m_port;
     QString m_file;

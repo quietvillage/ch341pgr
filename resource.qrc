@@ -2,5 +2,6 @@
     <qresource prefix="/">
         <file>translations/ch341pgr_en.qm</file>
         <file>SourceCodePro.otf</file>
+        <file>logo.png</file>
     </qresource>
 </RCC>
