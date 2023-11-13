@@ -5,7 +5,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QScrollBar>
-#include <QTextBlock>
+#include <QResizeEvent>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -229,6 +229,8 @@ void MainWindow::blockActions(bool block)
     ui->btn_detect->setEnabled(block);
     ui->btn_open->setEnabled(block);
     ui->action_open->setEnabled(block);
+    ui->btn_cropping->setEnabled(block);
+    ui->action_cropping->setEnabled(block);
 }
 
 void MainWindow::on_btn_checkEmpty_clicked()
@@ -419,7 +421,6 @@ void MainWindow::on_btn_check_clicked()
         return;
     }
 
-    m_port.setPortName(ui->combo_ports->currentText());
     int size, step = CH341_DEFAULT_BUF_LEN, len = ui->hexView->data().length();
     if (!(size = this->chipSize())) {return;}
     this->initModel();
