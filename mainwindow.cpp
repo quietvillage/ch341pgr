@@ -103,20 +103,38 @@ void MainWindow::on_action_quit_triggered()
 void MainWindow::on_btn_flush_clicked()
 {
     QStringList portList;
-    QDir dir("/dev");
-    portList = dir.entryList(QDir::System);
-    for (int i = portList.size() - 1; i >= 0; --i ) {
-        if ("ch34x_pis" != portList.at(i).left(9)) {
-            portList.removeAt(i);
+    int err, i, count;
+    ui->combo_ports->clear();
+    err = libusb_init(nullptr);
+    if (err < 0) {
+        return;
+    }
+
+    struct libusb_device **devices;
+    struct libusb_device_descriptor devDescriptor;
+    count = libusb_get_device_list(nullptr, &devices);
+
+    for (i = 0; i < count; ++i) {
+        err = libusb_get_device_descriptor(devices[i], &devDescriptor);
+        if (err < 0) {
+            goto _exit;
+        }
+
+        if (CH341_VENDOR_ID == devDescriptor.idVendor &&
+                CH341_PRODUCT_ID == devDescriptor.idProduct)
+        {
+            portList << QString("USB %1").arg(libusb_get_port_number(devices[i]));
         }
     }
 
-    ui->combo_ports->clear();
     if (portList.size()) {
         ui->combo_ports->addItems(portList);
     }
+    m_port.setPortNumber(ui->combo_ports->currentText().mid(4).toInt());
 
-    m_port.setPortName(ui->combo_ports->currentText());
+_exit:
+    libusb_free_device_list(devices, 1);
+    libusb_exit(nullptr);
 }
 
 
@@ -235,7 +253,7 @@ void MainWindow::blockActions(bool block)
 
 void MainWindow::on_btn_checkEmpty_clicked()
 {
-    int size, step = CH341_DEFAULT_BUF_LEN, j;
+    int size, j, step = CH341_MAX_BUF_LEN; //一次读取 4KB
     if (!(size = this->chipSize())) {return;}
 
     this->initModel();
@@ -243,10 +261,6 @@ void MainWindow::on_btn_checkEmpty_clicked()
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
         return;
-    }
-
-    if (ui->combo_memType->currentIndex()) {
-        m_port.i2cCurrentByte();
     }
 
     QByteArray stepData;
@@ -294,18 +308,15 @@ final:
 void MainWindow::on_btn_read_clicked()
 {
     QByteArray buffer;
-    int size, step = CH341_DEFAULT_BUF_LEN;
+    int size, step = CH341_MAX_BUF_LEN; //一次读取 4KB
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
     int i = m_port.openDevice();
+
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
         return;
-    }
-
-    if (ui->combo_memType->currentIndex()) {
-        m_port.i2cCurrentByte();
     }
 
     QByteArray stepData;
@@ -320,6 +331,7 @@ void MainWindow::on_btn_read_clicked()
         if (size - i < step) {
             step = size - i;
         }
+
         stepData = m_port.read(step, i);
         if (stepData.length() != step) {
             ++errCount;
@@ -366,10 +378,6 @@ void MainWindow::on_btn_write_clicked()
         if (0 == i) {return;}
     }else {
         size = ui->hexView->data().length();
-    }
-
-    if (ui->combo_memType->currentIndex()) {
-        m_port.i2cCurrentByte();
     }
 
     ui->progressBar->setValue(0);
@@ -421,7 +429,8 @@ void MainWindow::on_btn_check_clicked()
         return;
     }
 
-    int size, step = CH341_DEFAULT_BUF_LEN, len = ui->hexView->data().length();
+    int size, step = CH341_MAX_BUF_LEN, //一次读取 4KB
+       len = ui->hexView->data().length();
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
@@ -429,10 +438,6 @@ void MainWindow::on_btn_check_clicked()
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
         return;
-    }
-
-    if (ui->combo_memType->currentIndex()) {
-        m_port.i2cCurrentByte();
     }
 
     QByteArray stepData;
@@ -512,7 +517,7 @@ void MainWindow::onMemTypeChanged(int index)
 
 void MainWindow::onPortChanged(const QString &port)
 {
-    m_port.setPortName(port);
+    m_port.setPortNumber(port.mid(4).toInt());
 }
 
 

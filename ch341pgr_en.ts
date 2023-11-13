@@ -38,7 +38,7 @@
     </message>
     <message>
         <location filename="mainwindow.ui" line="51"/>
-        <location filename="mainwindow.cpp" line="162"/>
+        <location filename="mainwindow.cpp" line="180"/>
         <source>容量：</source>
         <translation>Capacity:</translation>
     </message>
@@ -49,13 +49,13 @@
     </message>
     <message>
         <location filename="mainwindow.ui" line="78"/>
-        <location filename="mainwindow.cpp" line="137"/>
+        <location filename="mainwindow.cpp" line="155"/>
         <source>Winbond</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="mainwindow.ui" line="83"/>
-        <location filename="mainwindow.cpp" line="138"/>
+        <location filename="mainwindow.cpp" line="156"/>
         <source>MXIC</source>
         <translation type="unfinished"></translation>
     </message>
@@ -66,7 +66,7 @@
     </message>
     <message>
         <location filename="mainwindow.ui" line="93"/>
-        <location filename="mainwindow.cpp" line="139"/>
+        <location filename="mainwindow.cpp" line="157"/>
         <source>未知</source>
         <translation>Unknown</translation>
     </message>
@@ -193,19 +193,19 @@
     <message>
         <location filename="mainwindow.cpp" line="60"/>
         <location filename="mainwindow.cpp" line="84"/>
-        <location filename="mainwindow.cpp" line="130"/>
-        <location filename="mainwindow.cpp" line="160"/>
+        <location filename="mainwindow.cpp" line="148"/>
         <location filename="mainwindow.cpp" line="178"/>
-        <location filename="mainwindow.cpp" line="188"/>
-        <location filename="mainwindow.cpp" line="241"/>
-        <location filename="mainwindow.cpp" line="264"/>
-        <location filename="mainwindow.cpp" line="300"/>
-        <location filename="mainwindow.cpp" line="324"/>
-        <location filename="mainwindow.cpp" line="357"/>
-        <location filename="mainwindow.cpp" line="391"/>
-        <location filename="mainwindow.cpp" line="428"/>
-        <location filename="mainwindow.cpp" line="452"/>
-        <location filename="mainwindow.cpp" line="476"/>
+        <location filename="mainwindow.cpp" line="196"/>
+        <location filename="mainwindow.cpp" line="206"/>
+        <location filename="mainwindow.cpp" line="259"/>
+        <location filename="mainwindow.cpp" line="278"/>
+        <location filename="mainwindow.cpp" line="315"/>
+        <location filename="mainwindow.cpp" line="336"/>
+        <location filename="mainwindow.cpp" line="369"/>
+        <location filename="mainwindow.cpp" line="399"/>
+        <location filename="mainwindow.cpp" line="437"/>
+        <location filename="mainwindow.cpp" line="457"/>
+        <location filename="mainwindow.cpp" line="481"/>
         <source>错误</source>
         <translation>Error</translation>
     </message>
@@ -220,32 +220,32 @@
         <location filename="mainwindow.cpp" line="74"/>
         <location filename="mainwindow.cpp" line="84"/>
         <location filename="mainwindow.cpp" line="92"/>
-        <location filename="mainwindow.cpp" line="125"/>
-        <location filename="mainwindow.cpp" line="130"/>
-        <location filename="mainwindow.cpp" line="160"/>
-        <location filename="mainwindow.cpp" line="171"/>
+        <location filename="mainwindow.cpp" line="143"/>
+        <location filename="mainwindow.cpp" line="148"/>
         <location filename="mainwindow.cpp" line="178"/>
-        <location filename="mainwindow.cpp" line="186"/>
-        <location filename="mainwindow.cpp" line="188"/>
-        <location filename="mainwindow.cpp" line="200"/>
-        <location filename="mainwindow.cpp" line="241"/>
-        <location filename="mainwindow.cpp" line="264"/>
-        <location filename="mainwindow.cpp" line="271"/>
-        <location filename="mainwindow.cpp" line="282"/>
-        <location filename="mainwindow.cpp" line="300"/>
-        <location filename="mainwindow.cpp" line="324"/>
-        <location filename="mainwindow.cpp" line="347"/>
-        <location filename="mainwindow.cpp" line="357"/>
-        <location filename="mainwindow.cpp" line="391"/>
-        <location filename="mainwindow.cpp" line="401"/>
-        <location filename="mainwindow.cpp" line="417"/>
-        <location filename="mainwindow.cpp" line="428"/>
-        <location filename="mainwindow.cpp" line="452"/>
+        <location filename="mainwindow.cpp" line="189"/>
+        <location filename="mainwindow.cpp" line="196"/>
+        <location filename="mainwindow.cpp" line="204"/>
+        <location filename="mainwindow.cpp" line="206"/>
+        <location filename="mainwindow.cpp" line="218"/>
+        <location filename="mainwindow.cpp" line="259"/>
+        <location filename="mainwindow.cpp" line="278"/>
+        <location filename="mainwindow.cpp" line="285"/>
+        <location filename="mainwindow.cpp" line="296"/>
+        <location filename="mainwindow.cpp" line="315"/>
+        <location filename="mainwindow.cpp" line="336"/>
+        <location filename="mainwindow.cpp" line="359"/>
+        <location filename="mainwindow.cpp" line="369"/>
+        <location filename="mainwindow.cpp" line="399"/>
+        <location filename="mainwindow.cpp" line="409"/>
+        <location filename="mainwindow.cpp" line="425"/>
+        <location filename="mainwindow.cpp" line="437"/>
         <location filename="mainwindow.cpp" line="457"/>
-        <location filename="mainwindow.cpp" line="476"/>
-        <location filename="mainwindow.cpp" line="483"/>
-        <location filename="mainwindow.cpp" line="494"/>
-        <location filename="mainwindow.cpp" line="535"/>
+        <location filename="mainwindow.cpp" line="462"/>
+        <location filename="mainwindow.cpp" line="481"/>
+        <location filename="mainwindow.cpp" line="488"/>
+        <location filename="mainwindow.cpp" line="499"/>
+        <location filename="mainwindow.cpp" line="540"/>
         <source>确定</source>
         <translation>Ok</translation>
     </message>
@@ -257,26 +257,26 @@
     <message>
         <location filename="mainwindow.cpp" line="74"/>
         <location filename="mainwindow.cpp" line="92"/>
-        <location filename="mainwindow.cpp" line="125"/>
-        <location filename="mainwindow.cpp" line="171"/>
-        <location filename="mainwindow.cpp" line="186"/>
-        <location filename="mainwindow.cpp" line="200"/>
-        <location filename="mainwindow.cpp" line="271"/>
-        <location filename="mainwindow.cpp" line="282"/>
-        <location filename="mainwindow.cpp" line="347"/>
-        <location filename="mainwindow.cpp" line="401"/>
-        <location filename="mainwindow.cpp" line="417"/>
-        <location filename="mainwindow.cpp" line="457"/>
-        <location filename="mainwindow.cpp" line="483"/>
-        <location filename="mainwindow.cpp" line="494"/>
-        <location filename="mainwindow.cpp" line="535"/>
+        <location filename="mainwindow.cpp" line="143"/>
+        <location filename="mainwindow.cpp" line="189"/>
+        <location filename="mainwindow.cpp" line="204"/>
+        <location filename="mainwindow.cpp" line="218"/>
+        <location filename="mainwindow.cpp" line="285"/>
+        <location filename="mainwindow.cpp" line="296"/>
+        <location filename="mainwindow.cpp" line="359"/>
+        <location filename="mainwindow.cpp" line="409"/>
+        <location filename="mainwindow.cpp" line="425"/>
+        <location filename="mainwindow.cpp" line="462"/>
+        <location filename="mainwindow.cpp" line="488"/>
+        <location filename="mainwindow.cpp" line="499"/>
+        <location filename="mainwindow.cpp" line="540"/>
         <source>提示</source>
         <translation>Information</translation>
     </message>
     <message>
         <location filename="mainwindow.cpp" line="74"/>
-        <location filename="mainwindow.cpp" line="347"/>
-        <location filename="mainwindow.cpp" line="417"/>
+        <location filename="mainwindow.cpp" line="359"/>
+        <location filename="mainwindow.cpp" line="425"/>
         <source>缓冲区没有内容</source>
         <translation>There is nothing in the buffer</translation>
     </message>
@@ -296,103 +296,103 @@
         <translation>Save done</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="125"/>
+        <location filename="mainwindow.cpp" line="143"/>
         <source>自动检测功能仅支持 25 系列存储器</source>
         <translation>The automatic detection only supports 25-series Spi Flash</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="149"/>
+        <location filename="mainwindow.cpp" line="167"/>
         <source>容量： %2KBytes</source>
         <translation>Capacity:  %2KBytes</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="151"/>
+        <location filename="mainwindow.cpp" line="169"/>
         <source>容量： %2MBytes</source>
         <translation>Capacity:  %2MBytes</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="156"/>
+        <location filename="mainwindow.cpp" line="174"/>
         <source>容量：(未知)</source>
         <translation>Capacity:  (Unknown)</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="160"/>
+        <location filename="mainwindow.cpp" line="178"/>
         <source>无法检测芯片</source>
         <translation>Could not to detect the chip</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="535"/>
+        <location filename="mainwindow.cpp" line="540"/>
         <source>缓冲区没有数据，无法裁剪</source>
         <translation>The buffer has no data and cannot be cropped</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="171"/>
+        <location filename="mainwindow.cpp" line="189"/>
         <source>EEPROM可直接写任何数据，不需要擦除</source>
         <translation>It is unnecessary to erase the EEPROMs. Just write what you want</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="182"/>
+        <location filename="mainwindow.cpp" line="200"/>
         <source>请稍后...</source>
         <translation>Please wait...</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="186"/>
+        <location filename="mainwindow.cpp" line="204"/>
         <source>擦除完成</source>
         <translation>Erase done</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="188"/>
+        <location filename="mainwindow.cpp" line="206"/>
         <source>擦除失败</source>
         <translation>Failed to erase</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="200"/>
+        <location filename="mainwindow.cpp" line="218"/>
         <source>请指定芯片型号</source>
         <translation>Please specify the chip model</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="271"/>
+        <location filename="mainwindow.cpp" line="285"/>
         <source>存储器内容不为空</source>
         <translation>The memory is not empty</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="282"/>
+        <location filename="mainwindow.cpp" line="296"/>
         <source>存储器内容是空的</source>
         <translation>The memory is empty</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="362"/>
+        <location filename="mainwindow.cpp" line="374"/>
         <source>确认</source>
         <translation>Ok</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="362"/>
+        <location filename="mainwindow.cpp" line="374"/>
         <source>缓冲区长度已超过存储器容量，超过部分将被直接丢弃，是否继续</source>
         <translation>The buffer data length has exceeded the memory capacity, and the excess will be discarded. Do you want to continue</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="362"/>
+        <location filename="mainwindow.cpp" line="374"/>
         <source>否</source>
         <translation>No</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="362"/>
+        <location filename="mainwindow.cpp" line="374"/>
         <source>是</source>
         <translation>Yes</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="401"/>
+        <location filename="mainwindow.cpp" line="409"/>
         <source>写入完成</source>
         <translation>Write done</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="457"/>
-        <location filename="mainwindow.cpp" line="483"/>
+        <location filename="mainwindow.cpp" line="462"/>
+        <location filename="mainwindow.cpp" line="488"/>
         <source>校验内容不一致</source>
         <translation>The memory contents and the buffer&apos;s are different</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="494"/>
+        <location filename="mainwindow.cpp" line="499"/>
         <source>校验完成，内容一致</source>
         <translation>Check done. The memory contents are the same as the buffer&apos;s</translation>
     </message>
@@ -400,32 +400,32 @@
 <context>
     <name>QObject</name>
     <message>
-        <location filename="ch341interface.cpp" line="113"/>
+        <location filename="ch341interface.cpp" line="166"/>
         <source>设备不存在</source>
         <translation>Device not found</translation>
     </message>
     <message>
-        <location filename="ch341interface.cpp" line="114"/>
+        <location filename="ch341interface.cpp" line="167"/>
         <source>没有权限或端口忙</source>
         <translation>No permission or the port is busy</translation>
     </message>
     <message>
-        <location filename="ch341interface.cpp" line="115"/>
+        <location filename="ch341interface.cpp" line="168"/>
         <source>打开设备出错</source>
         <translation>Error to open the device</translation>
     </message>
     <message>
-        <location filename="ch341interface.cpp" line="116"/>
+        <location filename="ch341interface.cpp" line="169"/>
         <source>读取出错</source>
         <translation>Error to read</translation>
     </message>
     <message>
-        <location filename="ch341interface.cpp" line="117"/>
+        <location filename="ch341interface.cpp" line="170"/>
         <source>写入出错</source>
         <translation>Error to write</translation>
     </message>
     <message>
-        <location filename="ch341interface.cpp" line="118"/>
+        <location filename="ch341interface.cpp" line="171"/>
         <source>该设备不支持此操作</source>
         <translation>Unsupported operation</translation>
     </message>

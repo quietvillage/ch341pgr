@@ -39,3 +39,8 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 RESOURCES += \
     resource.qrc
+
+unix: LIBS += -L$$PWD/libusb/ -lusb-1.0
+
+INCLUDEPATH += $$PWD/libusb
+DEPENDPATH += $$PWD/libusb
