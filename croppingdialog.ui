@@ -86,7 +86,7 @@
     <number>2147483647</number>
    </property>
   </widget>
-  <widget class="QPushButton" name="otn_ok">
+  <widget class="QPushButton" name="btn_ok">
    <property name="geometry">
     <rect>
      <x>89</x>

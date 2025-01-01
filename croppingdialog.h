@@ -26,7 +26,7 @@ signals:
 private slots:
     void on_btn_chop_clicked();
 
-    void on_otn_ok_clicked();
+    void on_btn_ok_clicked();
 
 private:
     Ui::CroppingDialog *ui;

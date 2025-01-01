@@ -37,7 +37,7 @@ void CroppingDialog::on_btn_chop_clicked()
 }
 
 
-void CroppingDialog::on_otn_ok_clicked()
+void CroppingDialog::on_btn_ok_clicked()
 {
     emit cropping(ui->spinBox_start->value(), ui->spinBox_end->value());
     this->hide();

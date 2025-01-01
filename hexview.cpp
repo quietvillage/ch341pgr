@@ -6,6 +6,7 @@
 #include <QPainter>
 #include <QResizeEvent>
 #include <QRegularExpressionValidator>
+#include <QCoreApplication>
 
 HexView::HexView(QWidget *parent)
     : QAbstractScrollArea{parent}
@@ -13,7 +14,8 @@ HexView::HexView(QWidget *parent)
     , m_currentRow(0)
     , m_editVisible(false)
 {
-    int index = QFontDatabase::addApplicationFont(":SourceCodePro.otf");
+    int index = QFontDatabase::addApplicationFont(
+                    QCoreApplication::applicationDirPath() + "/font/SourceCodePro.otf");
     if (index != -1) {
         QStringList fontList(QFontDatabase::applicationFontFamilies(index));
         if(fontList.count() > 0) {
@@ -40,6 +42,10 @@ HexView::HexView(QWidget *parent)
     connect(m_edit, SIGNAL(editingFinished()), this, SLOT(onEditingFinished()));
 }
 
+HexView::~HexView()
+{
+    delete m_edit;
+}
 
 void HexView::paintEvent(QPaintEvent *)
 {
