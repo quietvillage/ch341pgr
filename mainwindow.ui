@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>880</width>
+    <width>900</width>
     <height>600</height>
    </rect>
   </property>
@@ -19,7 +19,7 @@
      <rect>
       <x>50</x>
       <y>10</y>
-      <width>658</width>
+      <width>666</width>
       <height>401</height>
      </rect>
     </property>
@@ -34,7 +34,7 @@
       <widget class="QWidget" name="widget" native="true">
        <property name="minimumSize">
         <size>
-         <width>151</width>
+         <width>161</width>
          <height>0</height>
         </size>
        </property>
@@ -67,7 +67,7 @@
        <widget class="QComboBox" name="combo_vendor">
         <property name="geometry">
          <rect>
-          <x>40</x>
+          <x>50</x>
           <y>90</y>
           <width>111</width>
           <height>28</height>
@@ -97,7 +97,7 @@
        <widget class="QComboBox" name="combo_model">
         <property name="geometry">
          <rect>
-          <x>40</x>
+          <x>50</x>
           <y>130</y>
           <width>111</width>
           <height>28</height>
@@ -146,7 +146,7 @@
        <widget class="QComboBox" name="combo_memType">
         <property name="geometry">
          <rect>
-          <x>40</x>
+          <x>50</x>
           <y>50</y>
           <width>111</width>
           <height>28</height>
@@ -168,7 +168,7 @@
          <rect>
           <x>0</x>
           <y>330</y>
-          <width>71</width>
+          <width>81</width>
           <height>28</height>
          </rect>
         </property>
@@ -179,7 +179,7 @@
        <widget class="QPushButton" name="btn_open">
         <property name="geometry">
          <rect>
-          <x>80</x>
+          <x>90</x>
           <y>290</y>
           <width>71</width>
           <height>28</height>
@@ -195,7 +195,7 @@
         </property>
         <property name="geometry">
          <rect>
-          <x>80</x>
+          <x>90</x>
           <y>330</y>
           <width>71</width>
           <height>28</height>
@@ -208,7 +208,7 @@
        <widget class="QComboBox" name="combo_ports">
         <property name="geometry">
          <rect>
-          <x>40</x>
+          <x>50</x>
           <y>10</y>
           <width>111</width>
           <height>28</height>
@@ -233,7 +233,7 @@
          <rect>
           <x>0</x>
           <y>290</y>
-          <width>71</width>
+          <width>81</width>
           <height>28</height>
          </rect>
         </property>
@@ -260,7 +260,7 @@
         </property>
         <property name="geometry">
          <rect>
-          <x>80</x>
+          <x>90</x>
           <y>370</y>
           <width>71</width>
           <height>28</height>
@@ -367,8 +367,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>880</width>
-     <height>25</height>
+     <width>900</width>
+     <height>27</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">

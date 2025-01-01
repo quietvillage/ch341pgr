@@ -55,6 +55,8 @@ private slots:
     void on_action_cropping_triggered();
     void onChopRequest(char); //删除尾部特定值
     void onCroppingRequest(int, int);
+    void onModelChanged(int index);
+
 
 private:
     int chipSize();

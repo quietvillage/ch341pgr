@@ -14,10 +14,13 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     this->setWindowIcon(QIcon(":logo.png"));
+    QFont font = this->font();
+    font.setPointSizeF(10.5);
+    this->setFont(font);
 
     this->on_btn_flush_clicked();
     this->onMemTypeChanged(0);
-    m_translator.load(":translations/ch341pgr_en.qm");
+    m_translator.load(QCoreApplication::applicationDirPath() + "/translations/ch341pgr_en.qm");
 
     ui->centralwidget->setLayout(ui->hLayout);
     ui->progressBar->setParent(ui->hexView);
@@ -28,6 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btn_cropping, SIGNAL(clicked()), this, SLOT(on_action_cropping_triggered()));
     connect(ui->combo_memType, SIGNAL(currentIndexChanged(int)), this, SLOT(onMemTypeChanged(int)));
     connect(ui->combo_ports, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(onPortChanged(const QString &)));
+    connect(ui->combo_model, SIGNAL(currentIndexChanged(int)), this, SLOT(onModelChanged(int)));
 }
 
 MainWindow::~MainWindow()
@@ -103,20 +107,38 @@ void MainWindow::on_action_quit_triggered()
 void MainWindow::on_btn_flush_clicked()
 {
     QStringList portList;
-    QDir dir("/dev");
-    portList = dir.entryList(QDir::System);
-    for (int i = portList.size() - 1; i >= 0; --i ) {
-        if ("ch34x_pis" != portList.at(i).left(9)) {
-            portList.removeAt(i);
+    int ret, i, count;
+    ui->combo_ports->clear();
+    ret = libusb_init(nullptr);
+    if (ret < 0) {
+        return;
+    }
+
+    struct libusb_device **devices;
+    struct libusb_device_descriptor devDescriptor;
+    count = libusb_get_device_list(nullptr, &devices);
+
+    for (i = 0; i < count; ++i) {
+        ret = libusb_get_device_descriptor(devices[i], &devDescriptor);
+        if (ret < 0) {
+            goto _exit;
+        }
+
+        if (CH341_VENDOR_ID == devDescriptor.idVendor &&
+                CH341_PRODUCT_ID == devDescriptor.idProduct)
+        {
+            portList << QString("USB %1").arg(libusb_get_port_number(devices[i]));
         }
     }
 
-    ui->combo_ports->clear();
     if (portList.size()) {
         ui->combo_ports->addItems(portList);
     }
+    m_port.setPortNumber(ui->combo_ports->currentText().mid(4).toInt());
 
-    m_port.setPortName(ui->combo_ports->currentText());
+_exit:
+    libusb_free_device_list(devices, 1);
+    libusb_exit(nullptr);
 }
 
 
@@ -147,9 +169,9 @@ void MainWindow::on_btn_detect_clicked()
 
         if ((uchar)info.at(2) >= 0x11 && (uchar)info.at(2) <= 0x1B) {
             if ((uchar)info.at(2) < 0x14) {
-                ui->label_size->setText(tr("容量： %2KBytes").arg(1 << ((uchar)info.at(2) - 0x11 + 7)));
+                ui->label_size->setText(tr("容量： %1KBytes").arg(1 << ((uchar)info.at(2) - 0x11 + 7)));
             }else {
-                ui->label_size->setText(tr("容量： %2MBytes").arg(1 << ((uchar)info.at(2) - 0x14)));
+                ui->label_size->setText(tr("容量： %1MBytes").arg(1 << ((uchar)info.at(2) - 0x14)));
             }
 
             ui->combo_model->setCurrentIndex((uchar)info.at(2) - 0x10);
@@ -235,7 +257,7 @@ void MainWindow::blockActions(bool block)
 
 void MainWindow::on_btn_checkEmpty_clicked()
 {
-    int size, step = CH341_DEFAULT_BUF_LEN, j;
+    int size, j, step = CH341_MAX_BUF_LEN; //一次读取 4KB
     if (!(size = this->chipSize())) {return;}
 
     this->initModel();
@@ -243,10 +265,6 @@ void MainWindow::on_btn_checkEmpty_clicked()
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
         return;
-    }
-
-    if (ui->combo_memType->currentIndex()) {
-        m_port.i2cCurrentByte();
     }
 
     QByteArray stepData;
@@ -294,18 +312,15 @@ final:
 void MainWindow::on_btn_read_clicked()
 {
     QByteArray buffer;
-    int size, step = CH341_DEFAULT_BUF_LEN;
+    int size, step = CH341_MAX_BUF_LEN; //一次读取 4KB
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
     int i = m_port.openDevice();
+
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
         return;
-    }
-
-    if (ui->combo_memType->currentIndex()) {
-        m_port.i2cCurrentByte();
     }
 
     QByteArray stepData;
@@ -320,6 +335,7 @@ void MainWindow::on_btn_read_clicked()
         if (size - i < step) {
             step = size - i;
         }
+
         stepData = m_port.read(step, i);
         if (stepData.length() != step) {
             ++errCount;
@@ -366,10 +382,6 @@ void MainWindow::on_btn_write_clicked()
         if (0 == i) {return;}
     }else {
         size = ui->hexView->data().length();
-    }
-
-    if (ui->combo_memType->currentIndex()) {
-        m_port.i2cCurrentByte();
     }
 
     ui->progressBar->setValue(0);
@@ -421,7 +433,8 @@ void MainWindow::on_btn_check_clicked()
         return;
     }
 
-    int size, step = CH341_DEFAULT_BUF_LEN, len = ui->hexView->data().length();
+    int size, step = CH341_MAX_BUF_LEN, //一次读取 4KB
+       len = ui->hexView->data().length();
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
@@ -429,10 +442,6 @@ void MainWindow::on_btn_check_clicked()
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
         return;
-    }
-
-    if (ui->combo_memType->currentIndex()) {
-        m_port.i2cCurrentByte();
     }
 
     QByteArray stepData;
@@ -512,7 +521,7 @@ void MainWindow::onMemTypeChanged(int index)
 
 void MainWindow::onPortChanged(const QString &port)
 {
-    m_port.setPortName(port);
+    m_port.setPortNumber(port.mid(4).toInt());
 }
 
 
@@ -565,6 +574,29 @@ void MainWindow::onCroppingRequest(int start, int end)
         ui->hexView->setData(QByteArray());
     }else {
         ui->hexView->setData(ui->hexView->data().mid(start, end - start + 1));
+    }
+}
+
+
+void MainWindow::onModelChanged(int index)
+{
+    if (ui->combo_memType->currentIndex() == 1) { //24 EEPROM
+        int size;
+        switch (index) {
+        case 0:
+            ui->label_size->setText(tr("容量：(未知)"));
+            break;
+        case 1: //24C01
+        case 2: //24C02
+        case 3: //24C04
+            size = 128 * (1 << (index - 1));
+            ui->label_size->setText(tr("容量：%1Bytes").arg(size));
+            break;
+        default:
+            size = 1 << (index - 4);
+            ui->label_size->setText(tr("容量：%1KBytes").arg(size));
+            break;
+        };
     }
 }
 
