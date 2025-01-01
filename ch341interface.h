@@ -1,48 +1,44 @@
 /*
- * Ch341Interface类提供了 CH341A 芯片的 SPI、I2C 接口，
+ * Ch341Interface类提供了 CH341 系列芯片的 SPI、I2C 接口，
  * 是依据沁恒官方（ 网址：www.wch.cn ） CH341A 接口库重写的
 */
 #ifndef CH341_INTERFACE_H
 #define CH341_INTERFACE_H
 
+#include "libusb/libusb.h"
 #include <QString>
 
-#define CH34x_GET_DRIVER_VERSION        0x01
-#define CH34x_CHIP_VERSION              0x03
-#define CH34x_PIPE_DATA_DOWN            0x09
-#define CH34x_PIPE_WRITE_READ           0x0a
+#define CH341_VENDOR_ID     0x1A86
+#define CH341_PRODUCT_ID    0x5512
 
+#define CH341_REQ_CHIP_VERSION  0x5F //请求版本
 
 #define CH341_MAX_BUF_LEN     4096
 #define CH341_DEFAULT_BUF_LEN 1024
 #define CH341_PACKET_LENGTH   32
+#define CH341_EPP_IO_MAX  (CH341_PACKET_LENGTH - 1)
 
-#define CH341A_CMD_SPI_STREAM   0xA8    //SPI Interface Command
-#define CH341A_CMD_I2C_STREAM   0xAA    // I2C Interface Command
-#define CH341A_CMD_UIO_STREAM   0xAB    // UIO Interface Command
-#define CH341A_CMD_PIO_STREAM   0xAE    // PIO Interface Command
+//放在包的第一个字节，标识数据流类型
+#define CH341_STREAM_TYPE_SPI   0xA8    //  SPI
+#define CH341_STREAM_TYPE_I2C   0xAA    // I2C
+#define CH341_STREAM_TYPE_UIO   0xAB    // Universal IO
+#define CH341_STREAM_TYPE_PARA  0xAE    // Parallel IO
 
-#define OPERATION_SPI_STREAM_READ   true
-#define OPERATION_SPI_STREAM_WRITE  false
+#define CH341_I2C_STREAM_CMD_START     0x74    //发起 I2C 起始条件
+#define CH341_I2C_STREAM_CMD_STOP      0x75    //产生 I2C 停止条件
+#define CH341_I2C_STREAM_CMD_OUT       0x80    //I2C Stream Out Command
+#define CH341_I2C_STREAM_CMD_IN        0xC0    //I2C Stream In Command
+#define CH341_I2C_STREAM_CMD_SET_MODE  0x60    //设置 I2C 时钟频率（部分芯片可用）
+#define CH341_I2C_STREAM_CMD_DELAY_US  0x40    //I2C Stream Delay(us)
+#define CH341_I2C_STREAM_CMD_DELAY_MS  0x50    //I2C Stream Delay(ms)
+#define CH341_I2C_STREAM_CMD_DELAY     0x0F    //I2C Stream Set Max Delay
+#define CH341_I2C_STREAM_CMD_END       0x00    //I2C Stream End Command
 
-#define CH341A_CMD_I2C_STREAM_START     0x74    //I2C Stream Start Command
-#define CH341A_CMD_I2C_STREAM_STOP      0x75    //I2C Stream Stop byte Command
-#define CH341A_CMD_I2C_STREAM_OUT       0x80    //I2C Stream Out Command
-#define CH341A_CMD_I2C_STREAM_IN        0xC0    //I2C Stream In Command
-#define CH341A_CMD_I2C_STREAM_MAX qMin(0x3F, CH341_PACKET_LENGTH)   //I2C Stream Max Length
-#define CH341A_CMD_I2C_STREAM_SET       0x60    //I2C Stream Set Mode
-//-->bit2   spi io (0: one in one out ; 1: two in two out)
-//-->bit1~0  I2C SCL Rate
-#define CH341A_CMD_I2C_STREAM_DELAY_US  0x40    //I2C Stream Delay(us)
-#define CH341A_CMD_I2C_STREAM_DELAY_MS  0x50    //I2C Stream Delay(ms)
-#define CH341A_CMD_I2C_STREAM_DELAY     0x0F    //I2C Stream Set Max Delay
-#define CH341A_CMD_I2C_STREAM_END       0x00    //I2C Stream End Command
-
-#define CH341A_CMD_UIO_STREAM_IN        0x00    // UIO Interface In ( D0 ~ D7 )
-#define CH341A_CMD_UIO_STREAM_DIRECT    0x40    // UIO interface Dir( set dir of D0~D5 )
-#define CH341A_CMD_UIO_STREAM_OUT       0x80    // UIO Interface Output(D0~D5)
-#define CH341A_CMD_UIO_STREAM_DELAY_US  0xC0    // UIO Interface Delay Command( us )
-#define CH341A_CMD_UIO_STREAM_END       0x20    // UIO Interface End Command
+#define CH341_UIO_STREAM_CMD_IN        0x00    // UIO Interface In ( D0 ~ D7 )
+#define CH341_UIO_STREAM_CMD_DIRECT    0x40    // UIO interface Dir( set dir of D0~D5 )
+#define CH341_UIO_STREAM_CMD_OUT       0x80    // UIO Interface Output(D0~D5)
+#define CH341_UIO_STREAM_CMD_DELAY_US  0xC0    // UIO Interface Delay Command( us )
+#define CH341_UIO_STREAM_CMD_END       0x20    // UIO Interface End Command
 
 class Ch341Interface
 {
@@ -56,7 +52,8 @@ public:
         OpenError,
         ReadError,
         WriteError,
-        UnsupportedOperationError
+        UnsupportedOperationError,
+        OverflowError
     };
 
     enum MemType {
@@ -66,30 +63,30 @@ public:
 
     bool openDevice();
     void closeDevice();
+
     QString errorMessage(int code = -1);
-    void setPortName(const QString &name) {m_portName = name;}
+    void setPortNumber(int port) {m_portNumber = port;}
     void setChipModel(enum MemType type, int modelIndex)
     {
         m_memType =  type;
         m_modelIndex = modelIndex;
     }
-    QString driverVersion();
-    QByteArray vendorId();
+
+   bool getChipVersion();
 
     QByteArray read(uint n, uint addr = 0);
     int write(const QByteArray &data, uint addr = 0);
 
-    void spiSetCS(uchar cs) {m_spiCS = 0x80 | (cs & 0x03);}
+    void spiSetCS(uchar cs) {m_spiCS = cs & 0x03;}
     QByteArray spiJedecId();
     bool spiEraseChip();
     bool spiEraseSector(uint addr);
-    bool spiReset();
-    char i2cCurrentByte();
 
 private:
-    bool ch341writePrivate(const QByteArray &in);
-    QByteArray spiStreamPrivate(const QByteArray &in, bool isRead);
-    QByteArray spiGetStatusPrivate(uchar cmd);
+    bool spiStreamStartPrivate();   //发起 spi 启动条件（拉低CS、CLK）
+    bool spiStreamStopPrivate();    //发出 spi 结束条件（拉高CS）
+    QByteArray spiCmdStreamPrivate(const QByteArray &in, int readLen);
+    inline QByteArray spiGetStatusPrivate(uchar cmd);
     bool spiWriteEnablePrivate();
     bool spiWaitPrivate();
 
@@ -103,14 +100,16 @@ private:
     int i2cWritePrivate(const QByteArray &in, uint addr);
     bool i2cPageProgramPrivate(const QByteArray &in, uint addr, uchar addrSize);
 
-    QString m_portName;
-    int m_fd;
+
+    libusb_device_handle *m_devHandle;
+    int m_portNumber; //当前端口号
     enum Ch341InterfaceError m_error;
     enum MemType m_memType;
     int m_modelIndex;
-    uchar m_vendorIc;
-    uchar m_streamMode; //最高位为数据发送模式 1-低位先发送 0-高位先发送
-    uchar m_spiCS; //chip select
+    uchar m_chipVersion; //0x20->CH341A, 0x30->CH341A3, 0x31、0x32->CH341B
+    uchar m_spiCS; // CS line: 0x00->D0, 0x01->D1, 0x02->D2, 0x03->D4
+    uint8_t m_bulkInEndpointAddr;
+    uint8_t m_bulkOutEndpointAddr;
 };
 
 #endif // CH341_INTERFACE_H

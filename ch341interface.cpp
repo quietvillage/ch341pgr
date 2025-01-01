@@ -2,10 +2,9 @@
 #include "chipdata.h"
 
 #include <unistd.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-#include <QFileInfo>
+#include <QObject>
 
+//#include <QDebug>
 static
 const uchar msbLsbSwappedTable[] = {
     0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0,
@@ -42,70 +41,145 @@ const uchar msbLsbSwappedTable[] = {
     0x1F, 0x9F, 0x5F, 0xDF, 0x3F, 0xBF, 0x7F, 0xFF
 };
 
-Ch341Interface::Ch341Interface():
-    m_fd(0),
-    m_error(NoError),
-    m_memType(SpiFlash),
-    m_modelIndex(0),
-    m_vendorIc(0x00),
-    m_streamMode(0x81),
-    m_spiCS(0x80)
+Ch341Interface::Ch341Interface()
+    : m_error(NoError)
+    , m_memType(SpiFlash)
+    , m_modelIndex(0)
+    , m_chipVersion(0x00)
+    , m_spiCS(0x00) //默认 CS 线 -> D0
+    , m_bulkInEndpointAddr(0)
+    , m_bulkOutEndpointAddr(0)
 {
 
 }
 
 bool Ch341Interface::openDevice()
 {
-    QFileInfo info("/dev/" + m_portName);
-    if ("" == m_portName || !info.exists()) {
+    int ret, i, count;
+    m_error = OpenError;
+    ret = libusb_init(nullptr);
+    if (ret != LIBUSB_SUCCESS) {return false;}
+
+    struct libusb_device **devices;
+    struct libusb_device_descriptor devDescriptor;
+    count = libusb_get_device_list(nullptr, &devices);
+    m_devHandle = nullptr;
+
+    for (i = 0; i < count; ++i) {
+        if (libusb_get_port_number(devices[i]) != m_portNumber) {
+            continue;
+        }
+
+        ret = libusb_get_device_descriptor(devices[i], &devDescriptor);
+        if (ret != LIBUSB_SUCCESS) {
+            continue;
+        }
+
+        if (CH341_VENDOR_ID != devDescriptor.idVendor ||
+            CH341_PRODUCT_ID != devDescriptor.idProduct)
+        {
+            continue;
+        }
+
+        ret = libusb_open(devices[i], &m_devHandle);
+        if (ret != LIBUSB_SUCCESS) {
+            if (LIBUSB_ERROR_ACCESS == ret) {
+                m_error = PermissionError;
+            }
+            goto _errExit;
+        }
+
+        if (libusb_kernel_driver_active(m_devHandle, 0) == 1) {
+            if (libusb_detach_kernel_driver(m_devHandle, 0) != 0) {//卸载内核驱动
+                goto _errCloseDevice;
+            }
+        }
+
+        int configs;
+        ret = libusb_get_configuration(m_devHandle, &configs);
+        if (ret != LIBUSB_SUCCESS) {
+            goto _errReattachDriver;
+        }
+
+        libusb_config_descriptor *configDesc;
+        const libusb_endpoint_descriptor *endpDesc;
+        ret = libusb_get_config_descriptor(devices[i], 0, &configDesc);
+        if (ret != LIBUSB_SUCCESS) {
+            goto _errReattachDriver;
+        }
+
+        for (int j = 0; j < configDesc->interface[0].altsetting[0].bNumEndpoints; ++j) {
+            endpDesc = &configDesc->interface[0].altsetting[0].endpoint[j];
+            if ((endpDesc->bEndpointAddress & LIBUSB_ENDPOINT_IN) &&
+                (endpDesc->bmAttributes & LIBUSB_TRANSFER_TYPE_MASK) == LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK)
+            {
+                m_bulkInEndpointAddr = endpDesc->bEndpointAddress; // 0x82
+            }
+
+            if (!(endpDesc->bEndpointAddress & LIBUSB_ENDPOINT_IN) &&
+                (endpDesc->bmAttributes & LIBUSB_TRANSFER_TYPE_MASK) == LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK)
+            {
+                m_bulkOutEndpointAddr = endpDesc->bEndpointAddress; //0x02
+            }
+        }
+
+        ret = libusb_claim_interface(m_devHandle, 0);
+        if (ret != LIBUSB_SUCCESS) {
+            goto _errReattachDriver;
+        }
+
+        break;
+    }
+
+    libusb_free_device_list(devices, 1);
+
+    if (i >= count) {
         m_error = DeviceNotFoundError;
-        return false;
+        goto _errExit;
     }
 
-    if (!(info.isReadable() && info.isWritable())) {
-        m_error = PermissionError;
-        return false;
+    if (getChipVersion()) {//获取 chipVersion 后才能正常使用
+        m_error = NoError;
+        return true;
     }
 
-    m_fd = open(info.filePath().toLocal8Bit(), O_RDWR);
-    if (m_fd < 0) {
-         m_error = OpenError;
-         return false;
-    }
-
-    this->vendorId(); //初始化 vendorIc 后才能正常使用
-
-    if (m_vendorIc < 0x20) {
-        m_error = UnsupportedOperationError;
-        return false;
-    }
-
-    m_error = NoError;
-    return true;
+    //err
+    libusb_release_interface(m_devHandle, 0);
+_errReattachDriver:
+    libusb_attach_kernel_driver(m_devHandle, 0);
+_errCloseDevice:
+    libusb_close(m_devHandle);
+_errExit:
+    libusb_exit(nullptr);
+    m_devHandle = nullptr;
+    return false;
 }
 
 void Ch341Interface::closeDevice()
 {
-    close(m_fd);
-    m_fd = 0;
-}
-
-QString Ch341Interface::driverVersion()
-{
-    char str[128] = {0x00};
-    ioctl(m_fd, CH34x_GET_DRIVER_VERSION, str);
-    return QString::fromLocal8Bit(str);
-}
-
-QByteArray Ch341Interface::vendorId()
-{
-    char str[4] = {0x00};
-    m_vendorIc = 0x00;
-    if (ioctl(m_fd, CH34x_CHIP_VERSION, str) >= 0) {
-        m_vendorIc = str[0];
+    if (m_devHandle) {
+        libusb_release_interface(m_devHandle, 0);
+        libusb_attach_kernel_driver(m_devHandle, 0);
+        libusb_close(m_devHandle);
+        libusb_exit(nullptr);
+        m_devHandle = nullptr;
     }
+}
 
-    return QByteArray(str, 2);
+
+bool Ch341Interface::getChipVersion()
+{
+    int ret;
+    uchar data[2] = {0x00};
+    m_chipVersion = 0x00;
+    ret = libusb_control_transfer(m_devHandle,
+              LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
+              CH341_REQ_CHIP_VERSION, 0x0000, 0x0000, data, 2, 1000);
+    //此处 ret 等于 2
+    if (ret != 2) {return false;}
+
+    m_chipVersion = data[0];
+    return true;
 }
 
 QString Ch341Interface::errorMessage(int code)
@@ -121,43 +195,11 @@ QString Ch341Interface::errorMessage(int code)
     case ReadError: text = QObject::tr("读取出错"); break;
     case WriteError: text = QObject::tr("写入出错"); break;
     case UnsupportedOperationError: text = QObject::tr("该设备不支持此操作"); break;
+    case OverflowError: text = QObject::tr("缓存溢出"); break;
     default: break;
     }
 
     return text;
-}
-
-char Ch341Interface::i2cCurrentByte()
-{
-    QByteArray buf;
-    char outBuf[2];
-    unsigned long retLen, data[4];
-    data[2] = (unsigned long) outBuf;
-    data[3] = (unsigned long) &retLen;
-    buf.append(CH341A_CMD_I2C_STREAM);
-    if (!(m_streamMode & 0x03)) {
-        buf.append(2, CH341A_CMD_I2C_STREAM_DELAY_US | 10);
-    }
-
-    buf.append(CH341A_CMD_I2C_STREAM_START);
-    buf.append((char)CH341A_CMD_I2C_STREAM_OUT | 1);
-    buf.append(0xA1);
-
-    buf.append((char)CH341A_CMD_I2C_STREAM_IN | 1);
-
-    buf.append(CH341A_CMD_I2C_STREAM_IN);
-    buf.append(CH341A_CMD_I2C_STREAM_STOP);
-    buf.append(1, CH341A_CMD_I2C_STREAM_END);
-
-    buf.append(CH341_PACKET_LENGTH - 1);
-    buf.append(7, 1);
-
-    data[0] = buf.length();
-    data[1] = (unsigned long) buf.data();
-
-    ioctl(m_fd, CH34x_PIPE_WRITE_READ, data);
-    usleep(10000);//延时 10ms
-    return outBuf[0];
 }
 
 QByteArray Ch341Interface::read(uint n, uint addr)
@@ -189,190 +231,228 @@ int Ch341Interface::write(const QByteArray &data, uint addr)
     return sum;
 }
 
-bool Ch341Interface::ch341writePrivate(const QByteArray &in)
+bool Ch341Interface::spiStreamStartPrivate()
 {
-    unsigned long len = in.length(),
-    data[2] = {
-        (unsigned long) &len,
-        (unsigned long) in.data()
-    };
+    QByteArray buf;
+    int ret;
 
-    if (ioctl(m_fd, CH34x_PIPE_DATA_DOWN, data) < 0 || (int)len != in.length()) {
-        m_error = WriteError;
-        return false;
+    //driving /CS and CLK(D3) low
+    buf.append(CH341_STREAM_TYPE_UIO);
+    switch (m_spiCS & 0x03) {
+    case 0x00: buf.append((char)CH341_UIO_STREAM_CMD_OUT | 0x36); break; //DCK/D3->0, CS/D0 ->0
+    case 0x01: buf.append((char)CH341_UIO_STREAM_CMD_OUT | 0x35); break; //DCK/D3->0, CS/D1 ->0
+    case 0x02: buf.append((char)CH341_UIO_STREAM_CMD_OUT | 0x33); break; //DCK/D3->0, CS/D2 ->0
+    case 0x03: buf.append((char)CH341_UIO_STREAM_CMD_OUT | 0x27); break; //DCK/D3->0, CS/D4 ->0
     }
 
-    return true;
+    buf.append(CH341_UIO_STREAM_CMD_DIRECT | 0x3F); //D5~D0
+    buf.append(CH341_UIO_STREAM_CMD_END);
+
+
+    ret = libusb_bulk_transfer(m_devHandle, m_bulkOutEndpointAddr,
+            (uchar *)buf.data(), buf.length(), nullptr, 1000);
+
+    return (LIBUSB_SUCCESS == ret);
 }
 
-
-QByteArray Ch341Interface::spiStreamPrivate(const QByteArray &in, bool isRead)
+bool Ch341Interface::spiStreamStopPrivate()
 {
-    if (m_vendorIc < 0x20 || (m_vendorIc > 0x25 && m_vendorIc < 0x30)) {
+    QByteArray buf;
+    int ret;
+
+    buf.append(CH341_STREAM_TYPE_UIO);
+    buf.append((char)CH341_UIO_STREAM_CMD_OUT | 0x37); //driving /CS(D0、D1、D2、D4) high
+    buf.append(CH341_UIO_STREAM_CMD_END);
+
+    ret = libusb_bulk_transfer(m_devHandle, m_bulkOutEndpointAddr,
+            (uchar *)buf.data(), buf.length(), nullptr, 1000);
+
+    return (LIBUSB_SUCCESS == ret);
+}
+
+//spi 指令流，读取及配置寄存器、擦除等操作, 数据长度小于一个包
+QByteArray Ch341Interface::spiCmdStreamPrivate(const QByteArray &in, int readLen)
+{
+    if (m_chipVersion < 0x20 || (m_chipVersion > 0x25 && m_chipVersion < 0x30)) {
         m_error = UnsupportedOperationError;
         return "";
     }
 
-    char outBuf[CH341_MAX_BUF_LEN];
-    QByteArray buf;
-    if (m_spiCS & 0x80) {
-        buf.append(CH341A_CMD_UIO_STREAM);
-        switch (m_spiCS & 0x03) {
-        case 0x00: buf.append((char)CH341A_CMD_UIO_STREAM_OUT | 0x36); break; //DCK/D3->0, D0 ->0
-        case 0x01: buf.append((char)CH341A_CMD_UIO_STREAM_OUT | 0x35); break; //DCK/D3->0, D1 ->0
-        case 0x02: buf.append((char)CH341A_CMD_UIO_STREAM_OUT | 0x33); break; //DCK/D3->0, D2 ->0
-        default: buf.append((char)CH341A_CMD_UIO_STREAM_OUT | 0x27); break; //DCK/D3->0, D4 ->0
-        }
-
-        buf.append(CH341A_CMD_UIO_STREAM_DIRECT | 0x3F);
-        buf.append(CH341A_CMD_UIO_STREAM_END);
-        buf.append(CH341_PACKET_LENGTH - buf.length() % CH341_PACKET_LENGTH, 0x00);
-    }
-
-    int i = buf.length() + CH341_PACKET_LENGTH;
-    int j = 0, len = in.length();
-    buf.append(CH341A_CMD_SPI_STREAM);
-
-    if (isRead) {
-        while (j < 4 && j < len) {
-            buf.append(msbLsbSwappedTable[(uchar)in.at(j++)]); //cmd + addr
-        }
-
-        if (j < len) {
-            buf.resize(buf.length() + len - j);
-        }
-    }else {
-        while (j < len) {
-            buf.append(msbLsbSwappedTable[(uchar)in.at(j++)]);
-        }
-    }
-
-    while (i < buf.length()) {
-        if (0x20 == m_vendorIc) {
-            buf.insert(i, CH341_PACKET_LENGTH, 0x00);
-            i += CH341_PACKET_LENGTH;
-        }
-
-        buf.insert(i, CH341A_CMD_SPI_STREAM);
-        i += CH341_PACKET_LENGTH;
-    }
-
-    buf.append(CH341_PACKET_LENGTH - 1);
-    buf.append(7, (len + CH341_PACKET_LENGTH - 1 - 1) / (CH341_PACKET_LENGTH - 1));
-
-    unsigned long retLen, data[4];
-    data[0] = buf.length();
-    data[1] = (unsigned long) buf.data();
-    data[2] = (unsigned long) outBuf;
-    data[3] = (unsigned long) &retLen;
-
-    if (ioctl(m_fd, CH34x_PIPE_WRITE_READ, data) < 0) {
+    if (readLen >= CH341_PACKET_LENGTH || in.length() >= CH341_PACKET_LENGTH) {
+        m_error = OverflowError;
         return "";
     }
 
-    buf.clear();
-    if (m_spiCS & 0x80) {
-        buf.append(CH341A_CMD_UIO_STREAM);
-        buf.append((char)CH341A_CMD_UIO_STREAM_OUT | 0x37);
-        buf.append(CH341A_CMD_UIO_STREAM_END);
+    uchar outBuf[CH341_PACKET_LENGTH];
+    uchar inBuf[CH341_PACKET_LENGTH];
+    int i, packLen, len, ret;
 
-        if (!ch341writePrivate(buf)) {return "";}
+    inBuf[0] = CH341_STREAM_TYPE_SPI;
+
+    i = 0;
+    while (i < in.length()) {
+        inBuf[i + 1] = msbLsbSwappedTable[(uchar)in.at(i)];
+        ++i;
     }
 
-    if (isRead) {
-        buf.clear();
-        if (m_streamMode & 0x80) {
-            while (retLen--) {
-                buf.prepend(msbLsbSwappedTable[(uchar)outBuf[retLen]]);
-            }
-        }else {
-            buf.append(outBuf, retLen);
+    packLen = i + 1;
+    if ((int)readLen >= packLen) {
+        packLen = readLen + 1;
+    }
+
+    //spi start
+    if (!spiStreamStartPrivate()) {
+        return "";
+    }
+
+    ret = libusb_bulk_transfer(m_devHandle, m_bulkOutEndpointAddr,
+            inBuf, packLen, nullptr, 1000);
+    if (ret != LIBUSB_SUCCESS) {return "";}
+
+    ret = libusb_bulk_transfer(m_devHandle, m_bulkInEndpointAddr,
+            outBuf, packLen - 1, &len, 1000);
+    if (ret != LIBUSB_SUCCESS) {return "";}
+
+    //spi stop
+    if (!spiStreamStopPrivate()) {
+        return "";
+    }
+
+    if (len < (int)readLen) {
+        return "";
+    }
+
+    if (readLen) {
+        len = readLen;
+        //spi数据总是低位先发
+        while (--len >= 0) {
+            outBuf[len] = msbLsbSwappedTable[outBuf[len]];
         }
 
-        return buf;
+        return QByteArray((char *) outBuf, readLen);
     }
 
     return "\x01"; //区别于错误情况
 }
 
-
 QByteArray Ch341Interface::spiJedecId()
 {
     QByteArray buf;
     buf.append(SPI_CMD_JEDEC_ID);
-    buf.append(1, 0x00); //addr23-16
-    buf.append(1, 0x00); //addr15-8
-    buf.append(1, 0x00); //addr7-0
-    buf = spiStreamPrivate(buf, OPERATION_SPI_STREAM_READ);
-    if (buf.length()) {
-        buf.remove(0, 1);
-    }else {
-        m_error = ReadError;
+
+    buf = this->spiCmdStreamPrivate(buf, 4);
+
+    if (buf.length() > 1) {
+        return buf.mid(1);
     }
 
-    return buf;
+    return "";
 }
+
 
 QByteArray Ch341Interface::spiReadPrivate(uint n, uint addr)
 {
-    QByteArray buf;
-
-    buf.append(SPI_CMD_READ_DATA); //cmd
-    buf.append(addr >> 16); //addr23 - 16
-    buf.append(addr >> 8); //addr15 - 8
-    buf.append(addr); //addr7 - 0
-    buf.resize(n + 4); //can be any value
-
-    buf = spiStreamPrivate(buf, OPERATION_SPI_STREAM_READ);
-    if (buf.length()) {
-        buf.remove(0, 4);
-    }else {
-        m_error = ReadError;
+    if (m_chipVersion < 0x20 || (m_chipVersion > 0x25 && m_chipVersion < 0x30)) {
+        m_error = UnsupportedOperationError;
+        return "";
     }
 
-    return buf;
+    if (n > CH341_MAX_BUF_LEN) {
+        m_error = OverflowError;
+        return "";
+    }
+
+    uchar outBuf[CH341_MAX_BUF_LEN + 4];
+    uchar inBuf[CH341_PACKET_LENGTH];
+    int i, ret, packLen, sum, retLen;
+
+    inBuf[0] = CH341_STREAM_TYPE_SPI;
+    inBuf[1] = msbLsbSwappedTable[SPI_CMD_READ_DATA]; //cmd
+    inBuf[2] = msbLsbSwappedTable[(addr >> 16) & 0xFF]; //addr23 - 16
+    inBuf[3] = msbLsbSwappedTable[(addr >> 8) & 0xFF]; //addr15 - 8
+    inBuf[4] = msbLsbSwappedTable[addr & 0xFF]; //addr7 - 0
+
+    //发起起始条件，拉低 CS、CLK
+    if (!spiStreamStartPrivate()) {
+        return "";
+    }
+
+    sum = n + 4; //total read
+    packLen = CH341_PACKET_LENGTH;
+    i = 0;
+    while (i < sum) {
+        if (packLen > sum - i + 1) {
+            packLen = sum - i + 1;
+        }
+        ret = libusb_bulk_transfer(m_devHandle, m_bulkOutEndpointAddr,
+                  inBuf, packLen, nullptr, 1000);
+        if (ret != LIBUSB_SUCCESS) {return "";}
+
+        ret = libusb_bulk_transfer(m_devHandle, m_bulkInEndpointAddr,
+                  &outBuf[i], packLen - 1, &retLen, 1000);
+        if (ret != LIBUSB_SUCCESS) {return "";}
+
+        i += retLen;
+    }
+
+
+    //结束操作，拉高 CS
+    if (!spiStreamStopPrivate()) {
+        return "";
+    }
+
+    i = sum - 1;
+    while (i >= 4) {
+        outBuf[i] = msbLsbSwappedTable[outBuf[i]];
+        --i;
+    }
+
+    return QByteArray((char *)outBuf + 4, n);
 }
 
-QByteArray Ch341Interface::spiGetStatusPrivate(uchar cmd)
+
+inline QByteArray Ch341Interface::spiGetStatusPrivate(uchar cmd)
 {
     QByteArray buf;
     buf.append(cmd);
-    buf.append(1, 0x00);
-    buf = spiStreamPrivate(buf, OPERATION_SPI_STREAM_READ);
+
+    buf = this->spiCmdStreamPrivate(buf, 2);
 
     if (buf.length() > 1) {
-        buf = buf.mid(1, 1);
-    }else {
-        buf.clear();
+        return buf.mid(1);
     }
 
-    return buf;
+    return "";
 }
 
 bool Ch341Interface::spiWriteEnablePrivate()
 {
-    if (!spiWaitPrivate()) {
-        return false;
-    }
+    if (!spiWaitPrivate()) {return false;}
 
     QByteArray buf;
     buf.append(SPI_CMD_WRITE_ENABLE);
-    return spiStreamPrivate(buf, OPERATION_SPI_STREAM_WRITE).length();
+
+    return spiCmdStreamPrivate(buf, 0).length();
 }
 
 bool Ch341Interface::spiWaitPrivate()
 {
     QByteArray buf;
+    int errCount = 0;
 
     while (1) {
         buf = spiGetStatusPrivate(SPI_CMD_READ_SR);
 
         if (!buf.length()) {
-            return false;
-        }
-
-        if (!(buf.at(0) & SPI_STATUS_BUSY)) {
-            return true;
+            ++errCount;
+            if (errCount > 5) {
+                return false;
+            }
+        }else {
+            errCount = 0;
+            if (!(buf.at(0) & SPI_STATUS_BUSY)) {
+                return true;
+            }
         }
     }
 
@@ -383,9 +463,9 @@ bool Ch341Interface::spiEraseChip()
 {
    if (!spiWriteEnablePrivate()) {return false;}
    QByteArray buf;
-
    buf.append(SPI_CMD_ERASE_CHIP);
-   if (!spiStreamPrivate(buf, OPERATION_SPI_STREAM_WRITE).length()) {
+
+   if (!spiCmdStreamPrivate(buf, 0).length()) {
        m_error = WriteError;
        return false;
    }
@@ -402,41 +482,7 @@ bool Ch341Interface::spiEraseSector(uint addr)
     buf.append(addr >> 8);
     buf.append(addr);
 
-    if (!spiStreamPrivate(buf, OPERATION_SPI_STREAM_WRITE).length()) {
-        m_error = WriteError;
-        return false;
-    }
-
-    return spiWaitPrivate();
-}
-
-bool Ch341Interface::spiReset()
-{
-    if (!spiWaitPrivate()) {return false;}
-
-    QByteArray buf;
-    buf.append(SPI_CMD_RESET_ENABLE);
-
-    if (!spiStreamPrivate(buf, OPERATION_SPI_STREAM_WRITE).length()) {return false;}
-
-    sleep(1);
-
-    buf[0] = SPI_CMD_RESET;
-    return spiStreamPrivate(buf, OPERATION_SPI_STREAM_WRITE).length();
-}
-
-bool Ch341Interface::spiPageProgramPrivate(const QByteArray &in, uint addr)
-{
-    if (!spiWriteEnablePrivate()) {return false;}
-
-    QByteArray buf;
-    buf.append(SPI_CMD_PAGE_PROGRAM);
-    buf.append(addr >> 16);
-    buf.append(addr >> 8);
-    buf.append(addr);
-    buf += in;
-
-    if (!spiStreamPrivate(buf, OPERATION_SPI_STREAM_WRITE).length()) {
+    if (!spiCmdStreamPrivate(buf, 0).length()) {
         m_error = WriteError;
         return false;
     }
@@ -446,6 +492,11 @@ bool Ch341Interface::spiPageProgramPrivate(const QByteArray &in, uint addr)
 
 int Ch341Interface::spiWritePrivate(const QByteArray &in, uint addr)
 {
+    if (m_chipVersion< 0x20 || (m_chipVersion > 0x25 && m_chipVersion < 0x30)) {
+        m_error = UnsupportedOperationError;
+        return -UnsupportedOperationError;
+    }
+
     int i = 0, sum = 0,
     step = SPI_MAX_PAGE_PRAGRAM_SIZE - addr % SPI_MAX_PAGE_PRAGRAM_SIZE,
     len = in.length();
@@ -458,6 +509,7 @@ int Ch341Interface::spiWritePrivate(const QByteArray &in, uint addr)
         m_error = WriteError;
         return -WriteError;
     }
+
     sum += step;
     len -= step;
     i += step;
@@ -479,85 +531,147 @@ int Ch341Interface::spiWritePrivate(const QByteArray &in, uint addr)
         addr += step;
         len -= step;
     }
-
     return sum;
 }
 
+bool Ch341Interface::spiPageProgramPrivate(const QByteArray &in, uint addr)
+{
+    uchar inBuf[CH341_PACKET_LENGTH];
+    uchar outBuf[CH341_PACKET_LENGTH];
+    uchar zeroPacket[CH341_PACKET_LENGTH] = {0x00};
+    int i, dataIndex, dataLen, ret, packLen;
+
+    if (!spiWriteEnablePrivate()) {return false;}
+
+    //发起起始条件，拉低 CS、CLK
+    if (!spiStreamStartPrivate()) {
+        return false;
+    }
+
+    inBuf[0] =  CH341_STREAM_TYPE_SPI;
+    inBuf[1] = msbLsbSwappedTable[(uchar)SPI_CMD_PAGE_PROGRAM];
+    inBuf[2] = msbLsbSwappedTable[(addr >> 16) & 0xFF];
+    inBuf[3] = msbLsbSwappedTable[(addr >> 8) & 0xFF];
+    inBuf[4] = msbLsbSwappedTable[addr & 0xFF];
+
+    dataLen = in.length();
+    i = 5;
+    dataIndex = 0;
+    while (dataIndex < dataLen) {
+        while (i < CH341_PACKET_LENGTH && dataIndex < dataLen) {
+            inBuf[i++] = msbLsbSwappedTable[(uchar)in.at(dataIndex++)];
+        }
+
+        packLen = i; //发送包长度
+
+        ret = libusb_bulk_transfer(m_devHandle, m_bulkOutEndpointAddr,
+                  inBuf, packLen, nullptr, 1000);
+        if (ret != LIBUSB_SUCCESS) {return false;}
+
+        if (0x20 == m_chipVersion) {
+            ret = libusb_bulk_transfer(m_devHandle, m_bulkOutEndpointAddr,
+                      zeroPacket, CH341_PACKET_LENGTH, nullptr, 1000);
+            if (ret != LIBUSB_SUCCESS) {return false;}
+        }
+
+        //清空缓冲区
+        libusb_bulk_transfer(m_devHandle, m_bulkInEndpointAddr,
+            outBuf, packLen - 1, nullptr, 1000);
+
+        i = 1; //开始下一个数据包
+    }
+
+    //结束操作，拉高 CS
+    if (!spiStreamStopPrivate()) {
+        return false;
+    }
+
+    return spiWaitPrivate();
+}
 
 QByteArray Ch341Interface::i2cReadPrivate(uint n, uint addr, uchar addrSize)
 {
-    if (m_vendorIc < 0x20) {
+    if (m_chipVersion < 0x20) {
         m_error = UnsupportedOperationError;
         return "";
     }
 
-    char outBuf[CH341_MAX_BUF_LEN];
-    QByteArray inBuf;
-    unsigned long retLen, data[4];
-    data[2] = (unsigned long) outBuf;
-    data[3] = (unsigned long) &retLen;
-
-    inBuf.append(CH341A_CMD_I2C_STREAM);
-
-    if (!(m_streamMode & 0x03)) {
-        inBuf.append(2, CH341A_CMD_I2C_STREAM_DELAY_US | 10);
-    }
-
-    inBuf.append(CH341A_CMD_I2C_STREAM_START);
-    inBuf.append(CH341A_CMD_I2C_STREAM_OUT | addrSize);
-    inBuf.append(0xA0 | ((addr >> ((addrSize - 1) * 8 - 1)) & 0x0E));
-    int i = addrSize - 2;
-    while (i > 0) {
-        inBuf.append(addr >> (i * 8));
-        i--;
-    }
-    inBuf.append(addr);
-
-    inBuf.append(CH341A_CMD_I2C_STREAM_START);
-    inBuf.append((char) CH341A_CMD_I2C_STREAM_OUT | 1);
-    inBuf.append(0xA0 | ((addr >> ((addrSize - 1) * 8 - 1)) & 0x0E) | 0x01); //器件地址（读）
-
-    int step = CH341_PACKET_LENGTH - 1;
-    i = n;
-    while (i > 0) {
-        if (i < step) {
-            step = i;
-        }
-
-        inBuf.append(CH341A_CMD_I2C_STREAM_IN | step);
-        if (step >= CH341_PACKET_LENGTH - 1) {
-            inBuf.append(1, CH341A_CMD_I2C_STREAM_END);
-            inBuf.append(CH341_PACKET_LENGTH - inBuf.length() % CH341_PACKET_LENGTH, 0x00);
-            inBuf.append(CH341A_CMD_I2C_STREAM);
-        }
-
-        i -= step;
-    }
-
-    inBuf.append(CH341A_CMD_I2C_STREAM_IN);
-    inBuf.append(CH341A_CMD_I2C_STREAM_STOP);
-    inBuf.append(1, CH341A_CMD_I2C_STREAM_END);
-
-    inBuf.append(CH341_PACKET_LENGTH - 1); //[index = length - 8] 一次读取的量
-
-    //[index = length - 4] //读取次数
-    inBuf.append(7, (n + CH341_PACKET_LENGTH - 1 - 1) / (CH341_PACKET_LENGTH - 1));
-
-    data[0] = inBuf.length();
-    data[1] = (unsigned long) inBuf.data();
-
-    if (ioctl(m_fd, CH34x_PIPE_WRITE_READ, data) < 0) {
-        m_error = ReadError;
+    if (n > CH341_MAX_BUF_LEN) {
+        m_error = OverflowError;
         return "";
     }
 
-    return QByteArray(outBuf, retLen);
+    uchar outBuf[CH341_MAX_BUF_LEN];
+    QByteArray inBuf;
+    int i, j, ret, step, retLen, remain;
+
+    inBuf.append(CH341_STREAM_TYPE_I2C);
+
+    inBuf.append(CH341_I2C_STREAM_CMD_START);
+    inBuf.append(CH341_I2C_STREAM_CMD_OUT | addrSize);
+
+    inBuf.append(0xA0 | ((addr >> ((addrSize - 1) * 8 - 1)) & 0x0E));
+    i = addrSize - 2;
+    while (i > 0) {
+        inBuf.append(addr >> (i * 8));
+        --i;
+    }
+    inBuf.append(addr);
+
+    inBuf.append(CH341_I2C_STREAM_CMD_START);
+    inBuf.append((char) CH341_I2C_STREAM_CMD_OUT | 1);
+    inBuf.append(0xA0 | ((addr >> ((addrSize - 1) * 8 - 1)) & 0x0E) | 0x01); //器件地址（读）
+
+    step = CH341_PACKET_LENGTH;
+    i = 0;
+    while (i < (int)n) {
+        if (step > (int)n - i) {
+            step = (int)n - i;
+        }
+
+        inBuf.append(CH341_I2C_STREAM_CMD_IN | step);
+        inBuf.append(1, CH341_I2C_STREAM_CMD_END);
+
+        ret = libusb_bulk_transfer(m_devHandle, m_bulkOutEndpointAddr,
+                  (uchar *)inBuf.data(), inBuf.length(), nullptr, 1000);
+        if (ret != LIBUSB_SUCCESS) {return "";}
+
+
+        remain = step;
+        for (j = 0; j < 5; ++j) {
+            usleep(1000); //等待 1ms，以便数据就位(100kHz)
+            ret = libusb_bulk_transfer(m_devHandle, m_bulkInEndpointAddr,
+                      &outBuf[i], remain, &retLen, 1000);
+            if (ret != LIBUSB_SUCCESS) {return "";}
+
+            i += retLen;
+            remain -= retLen;
+            if (0 == remain) {
+                break;
+            }
+        }
+
+        if (j >= 5) {return "";} //错误
+
+        inBuf.clear();
+        inBuf.append(CH341_STREAM_TYPE_I2C);
+    }
+
+    //inBuf.append(CH341_I2C_STREAM_CMD_IN | 0);
+    inBuf.append(CH341_I2C_STREAM_CMD_STOP);
+    inBuf.append(1, CH341_I2C_STREAM_CMD_END);
+
+    ret = libusb_bulk_transfer(m_devHandle, m_bulkOutEndpointAddr,
+              (uchar *)inBuf.data(), inBuf.length(), nullptr, 1000);
+    if (ret != LIBUSB_SUCCESS) {return "";}
+
+    return QByteArray((char *)outBuf, n);
 }
 
 
 int Ch341Interface::i2cWritePrivate(const QByteArray &in, uint addr)
 {
-    if (m_vendorIc < 0x20) {
+    if (m_chipVersion < 0x20) {
         m_error = UnsupportedOperationError;
         return -UnsupportedOperationError;
     }
@@ -621,22 +735,19 @@ bool Ch341Interface::i2cPageProgramPrivate(const QByteArray &in, uint addr, ucha
 {
     QByteArray buf;
     int i, len;
-    buf.append(CH341A_CMD_I2C_STREAM);
-    if (!(m_streamMode & 0x03)) {
-        buf.append(2, CH341A_CMD_I2C_STREAM_DELAY_US | 10);
-    }
-    buf.append(CH341A_CMD_I2C_STREAM_START);
+    buf.append(CH341_STREAM_TYPE_I2C);
+    buf.append(CH341_I2C_STREAM_CMD_START);
     len = CH341_PACKET_LENGTH - buf.length() - 2;
     if (len > in.length() + addrSize) {
         len = in.length() + addrSize;
     }
-    buf.append(CH341A_CMD_I2C_STREAM_OUT | len);
+    buf.append(CH341_I2C_STREAM_CMD_OUT | len);
 
     buf.append(0xA0 | (addr >> ((addrSize - 1) * 8 - 1) & 0x0E));
     i = addrSize - 2;
     while (i > 0) {
         buf.append(addr >> (i * 8));
-        i--;
+        ++i;
     }
     buf.append(addr);
     buf += in;
@@ -645,18 +756,21 @@ bool Ch341Interface::i2cPageProgramPrivate(const QByteArray &in, uint addr, ucha
     len = CH341_PACKET_LENGTH - 3;
 
     while (i < buf.size() + 1) {
-        buf.insert(i, (char) CH341A_CMD_I2C_STREAM_END);
-        buf.insert(i + 1, (char) CH341A_CMD_I2C_STREAM);
+        buf.insert(i, (char) CH341_I2C_STREAM_CMD_END);
+        buf.insert(i + 1, (char) CH341_STREAM_TYPE_I2C);
         if (buf.size() - i - 2 < len) {
             len = buf.size() - i - 2;
         }
-        buf.insert(i + 2, CH341A_CMD_I2C_STREAM_OUT | len);
+        buf.insert(i + 2, CH341_I2C_STREAM_CMD_OUT | len);
         i += CH341_PACKET_LENGTH;
     }
 
-    buf.append(CH341A_CMD_I2C_STREAM_STOP);
-    buf.append(1, CH341A_CMD_I2C_STREAM_END);
+    buf.append(CH341_I2C_STREAM_CMD_STOP);
+    buf.append(1, CH341_I2C_STREAM_CMD_END);
 
-    return ch341writePrivate(buf);
+    i = libusb_bulk_transfer(m_devHandle, m_bulkOutEndpointAddr,
+            (uchar *)buf.data(), buf.length(), &len, 1000);
+
+    return (LIBUSB_SUCCESS == i);
 }
 
