@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
                 process.startDetached();
                 process.waitForFinished(1000);
 
-                QThread::msleep(500); //等待 0.5 秒，让新进程写入数据
+                QThread::msleep(1000); //等待 1 秒，让新进程写入数据
                 sharedMemory->lock();
                 memcpy(msg.data(), sharedMemory->data(), key.size());
                 sharedMemory->unlock();
