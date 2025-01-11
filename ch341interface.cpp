@@ -122,7 +122,8 @@ bool Ch341Interface::openDevice()
                 m_bulkOutEndpointAddr = endpDesc->bEndpointAddress; //0x02
             }
         }
-
+        
+        libusb_free_config_descriptor(configDesc);
         ret = libusb_claim_interface(m_devHandle, 0);
         if (ret != LIBUSB_SUCCESS) {
             goto _errReattachDriver;
@@ -131,14 +132,13 @@ bool Ch341Interface::openDevice()
         break;
     }
 
-    libusb_free_device_list(devices, 1);
-
     if (i >= count) {
         m_error = DeviceNotFoundError;
         goto _errExit;
     }
 
     if (getChipVersion()) {//获取 chipVersion 后才能正常使用
+        libusb_free_device_list(devices, 1);
         m_error = NoError;
         return true;
     }
@@ -150,6 +150,7 @@ _errReattachDriver:
 _errCloseDevice:
     libusb_close(m_devHandle);
 _errExit:
+    libusb_free_device_list(devices, 1);
     libusb_exit(nullptr);
     m_devHandle = nullptr;
     return false;
