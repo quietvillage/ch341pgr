@@ -23,7 +23,8 @@ HEADERS += \
     chipdata.h \
     croppingdialog.h \
     hexview.h \
-    mainwindow.h
+    mainwindow.h \
+    version.h
 
 FORMS += \
     croppingdialog.ui \

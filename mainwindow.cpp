@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "chipdata.h"
+#include "version.h"
 
 #include <QFileDialog>
 #include <QMessageBox>
@@ -11,8 +12,10 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_croppingDialog(nullptr)
+    , m_uid(0)
 {
     ui->setupUi(this);
+    this->setWindowTitle(QString("ch341pgr - v%1").arg(CH341PGR_VERSION_STRING));
     this->setWindowIcon(QIcon(":logo.png"));
     QFont font = this->font();
     font.setPointSizeF(10.5);
@@ -20,6 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     this->on_btn_flush_clicked();
     this->onMemTypeChanged(0);
+    m_homeDir = QDir::homePath();
     m_translator.load(QCoreApplication::applicationDirPath() + "/translations/ch341pgr_en.qm");
 
     ui->centralwidget->setLayout(ui->hLayout);
@@ -30,7 +34,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btn_save, SIGNAL(clicked()), this, SLOT(on_action_save_triggered()));
     connect(ui->btn_cropping, SIGNAL(clicked()), this, SLOT(on_action_cropping_triggered()));
     connect(ui->combo_memType, SIGNAL(currentIndexChanged(int)), this, SLOT(onMemTypeChanged(int)));
-    connect(ui->combo_ports, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(onPortChanged(const QString &)));
+    connect(ui->combo_ports, SIGNAL(currentIndexChanged(int)), this, SLOT(onPortChanged(int)));
     connect(ui->combo_model, SIGNAL(currentIndexChanged(int)), this, SLOT(onModelChanged(int)));
 }
 
@@ -57,7 +61,7 @@ void MainWindow::onloaded()
 
 void MainWindow::on_action_open_triggered()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("打开文件"), "" == m_file? QDir::homePath() : m_file, tr("bin文件(*.bin *.rom);;全部文件(*)"));
+    QString fileName = QFileDialog::getOpenFileName(this, tr("打开文件"), "" == m_file? m_homeDir : m_file, tr("bin文件(*.bin *.rom);;全部文件(*)"));
     if ("" == fileName) {return;}
 
     QFile file(fileName);
@@ -81,7 +85,7 @@ void MainWindow::on_action_save_triggered()
     }
 
     QFileInfo info(m_file);
-    QString fileName = QFileDialog::getSaveFileName(this, tr("保存文件"), (info.path() == "" ? QDir::homePath() : info.path()) + tr("/新建文件"), tr("bin文件(*.bin *.rom);;全部文件(*)"));
+    QString fileName = QFileDialog::getSaveFileName(this, tr("保存文件"), (info.path() == "" ? m_homeDir : info.path()) + tr("/新建文件"), tr("bin文件(*.bin *.rom);;全部文件(*)"));
     if ("" == fileName) {return;}
 
     QFile file(fileName);
@@ -94,6 +98,11 @@ void MainWindow::on_action_save_triggered()
     file.write(ui->hexView->data());
     ui->hexView->setBusy(false);
     file.close();
+
+    if (getuid() != m_uid) { //非root用户
+        chown(fileName.toLocal8Bit(), m_uid, m_gid);
+    }
+
     QMessageBox::information(this, tr("提示"), tr("保存完成"), tr("确定"));
 }
 
@@ -109,6 +118,7 @@ void MainWindow::on_btn_flush_clicked()
     QStringList portList;
     int ret, i, count;
     ui->combo_ports->clear();
+    m_portList.clear();
     ret = libusb_init(nullptr);
     if (ret < 0) {
         return;
@@ -127,14 +137,16 @@ void MainWindow::on_btn_flush_clicked()
         if (CH341_VENDOR_ID == devDescriptor.idVendor &&
                 CH341_PRODUCT_ID == devDescriptor.idProduct)
         {
-            portList << QString("USB %1").arg(libusb_get_port_number(devices[i]));
+            ret = libusb_get_port_number(devices[i]);
+            portList << QString("USB %1").arg(ret);
+            m_portList << QPair(libusb_get_bus_number(devices[i]), ret);
         }
     }
 
     if (portList.size()) {
         ui->combo_ports->addItems(portList);
+        m_port.setPort(m_portList.at(ui->combo_ports->currentIndex()));
     }
-    m_port.setPortNumber(ui->combo_ports->currentText().mid(4).toInt());
 
 _exit:
     libusb_free_device_list(devices, 1);
@@ -519,9 +531,9 @@ void MainWindow::onMemTypeChanged(int index)
 }
 
 
-void MainWindow::onPortChanged(const QString &port)
+void MainWindow::onPortChanged(int index)
 {
-    m_port.setPortNumber(port.mid(4).toInt());
+    m_port.setPort(m_portList.at(index));
 }
 
 

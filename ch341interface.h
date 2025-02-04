@@ -7,6 +7,7 @@
 
 #include "libusb/libusb.h"
 #include <QString>
+#include <QPair>
 
 #define CH341_VENDOR_ID     0x1A86
 #define CH341_PRODUCT_ID    0x5512
@@ -65,7 +66,7 @@ public:
     void closeDevice();
 
     QString errorMessage(int code = -1);
-    void setPortNumber(int port) {m_portNumber = port;}
+    void setPort(const QPair<int, int> &port) {m_port = port;}
     void setChipModel(enum MemType type, int modelIndex)
     {
         m_memType =  type;
@@ -102,7 +103,7 @@ private:
 
 
     libusb_device_handle *m_devHandle;
-    int m_portNumber; //当前端口号
+    QPair<int, int> m_port; //当前端口号
     enum Ch341InterfaceError m_error;
     enum MemType m_memType;
     int m_modelIndex;

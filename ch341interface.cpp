@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <QObject>
 
-//#include <QDebug>
 static
 const uchar msbLsbSwappedTable[] = {
     0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0,
@@ -66,19 +65,22 @@ bool Ch341Interface::openDevice()
     m_devHandle = nullptr;
 
     for (i = 0; i < count; ++i) {
-        if (libusb_get_port_number(devices[i]) != m_portNumber) {
+        if (libusb_get_bus_number(devices[i]) != m_port.first ||
+                libusb_get_port_number(devices[i]) != m_port.second)
+        {
             continue;
         }
 
         ret = libusb_get_device_descriptor(devices[i], &devDescriptor);
         if (ret != LIBUSB_SUCCESS) {
-            continue;
+            goto _errExit;
         }
 
         if (CH341_VENDOR_ID != devDescriptor.idVendor ||
             CH341_PRODUCT_ID != devDescriptor.idProduct)
         {
-            continue;
+            m_error = DeviceNotFoundError;
+            goto _errExit;
         }
 
         ret = libusb_open(devices[i], &m_devHandle);
@@ -93,12 +95,6 @@ bool Ch341Interface::openDevice()
             if (libusb_detach_kernel_driver(m_devHandle, 0) != 0) {//卸载内核驱动
                 goto _errCloseDevice;
             }
-        }
-
-        int configs;
-        ret = libusb_get_configuration(m_devHandle, &configs);
-        if (ret != LIBUSB_SUCCESS) {
-            goto _errReattachDriver;
         }
 
         libusb_config_descriptor *configDesc;

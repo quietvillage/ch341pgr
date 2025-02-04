@@ -57,7 +57,11 @@ int main(int argc, char *argv[])
 
                 //传递共享内存的key值给新进程
                 args << "echo '" + pwd + "'" + " | sudo -S " +
-                            QApplication::applicationFilePath() + " " + key;
+                        QApplication::applicationFilePath() +
+                        " " + key +
+                        " " + w.homeDir() +
+                        " " + QString::number(getuid()) +
+                        " " + QString::number(getgid());
 
                 process.setProgram("/bin/bash");
                 process.setArguments(args);
@@ -108,6 +112,10 @@ int main(int argc, char *argv[])
             }
 
             delete sharedMemory;
+
+            w.setHomeDir(argv[2]);
+            w.setUid(QString(argv[3]).toUInt());
+            w.setGid(QString(argv[4]).toUInt());
         }
     }
 

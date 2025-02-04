@@ -5,6 +5,7 @@
 #include "croppingdialog.h"
 #include <QMainWindow>
 #include <QTranslator>
+#include <unistd.h>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -19,6 +20,10 @@ public:
     ~MainWindow();
 
     void onloaded();
+    QString homeDir() {return m_homeDir;}
+    void setHomeDir(const QString &dir) {m_homeDir = dir;}
+    void setUid(uid_t id) {m_uid = id;}
+    void setGid(uid_t id) {m_gid = id;}
 
 protected:
     void resizeEvent(QResizeEvent *e);
@@ -46,7 +51,7 @@ private slots:
 
     void on_btn_detect_clicked();
 
-    void onPortChanged(const QString &port);
+    void onPortChanged(int index);
 
     void on_action_select_zh_CN_triggered();
 
@@ -68,5 +73,9 @@ private:
     QTranslator m_translator;
     Ch341Interface m_port;
     QString m_file;
+    QString m_homeDir;
+    QList<QPair<int, int>> m_portList;
+    uid_t m_uid; //user id
+    uid_t m_gid; //group id
 };
 #endif // MAINWINDOW_H
