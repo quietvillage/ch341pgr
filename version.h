@@ -1,0 +1,8 @@
+#ifndef VERSION_H
+#define VERSION_H
+
+#define CH341PGR_VERSION_STRING "1.0.1"
+
+#define CH341PGR_VERSION    0x010001
+
+#endif // VERSION_H
