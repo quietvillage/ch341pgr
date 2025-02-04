@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
         delete sharedMemory;
         //run in normal user mode
     }else {
-        if (argc > 1) { //是我们启动的进程
+        if (5 == argc) { //是我们启动的进程
             QString key = QString::fromLocal8Bit(argv[1]);
             QSharedMemory *sharedMemory = new QSharedMemory;
             sharedMemory->setKey(key);
