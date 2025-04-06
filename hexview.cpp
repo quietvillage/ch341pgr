@@ -27,7 +27,7 @@ HexView::HexView(QWidget *parent)
 
     QFontMetrics fm(this->font());
     m_lineHeight = fm.height();
-    m_lineWidth = fm.horizontalAdvance('X') * 76;
+    m_lineWidth = fm.horizontalAdvance('X') * ROW_CHAR_COUNT;
 
     m_edit = new QLineEdit(this);
     m_edit->setFixedWidth(fm.horizontalAdvance("XX") + 7);
@@ -60,12 +60,10 @@ void HexView::paintEvent(QPaintEvent *)
     len = m_data.length();
     if (!len) {return;}
 
-    x = -this->horizontalScrollBar()->value();
+    x = -this->horizontalScrollBar()->value() * m_lineWidth / ROW_CHAR_COUNT;
     y = step = m_lineHeight + ROW_SPACING;
     i = this->verticalScrollBar()->value();
-    i -= i % step;
-    this->verticalScrollBar()->setValue(i); //使其值始终为step的整数倍
-    i = (i / step) << 4;
+    i <<= 4;
 
     painter.drawLine(0, y + ROW_SPACING, viewWidth, y + ROW_SPACING);
     painter.drawText(x, y,
@@ -112,7 +110,7 @@ _drawCoordinate:
     if (pos > 0 && pos < viewWidth) {
         painter.drawLine(pos, 10, pos, viewHeight - 5);
     }
-    pos = m_currentRow * step - this->verticalScrollBar()->value(); //当前行
+    pos = (m_currentRow - this->verticalScrollBar()->value()) * step; //当前行
     if (pos >= 0 && pos < viewHeight - step - m_lineHeight) {
         ++i;
         pos += m_lineHeight + ROW_SPACING + step + 5;
@@ -120,9 +118,9 @@ _drawCoordinate:
     }
 
     if (i >= 2 && m_editVisible) {
-        y = m_currentRow * step - this->verticalScrollBar()->value() + step + 10;
+        y = (m_currentRow - this->verticalScrollBar()->value()) * step + step + 10;
         step = m_lineWidth / ROW_CHAR_COUNT;
-        x = (m_currentColumn * 3 + 10) * step - this->horizontalScrollBar()->value() - 2;
+        x = (m_currentColumn * 3 + 10 - this->horizontalScrollBar()->value()) * step - 2;
         m_edit->setVisible(true);
         m_edit->move(x, y);
     }else {
@@ -141,19 +139,11 @@ void HexView::wheelEvent(QWheelEvent *e)
     if (this->verticalScrollBar()->isHidden()) {
         e->ignore();
     }else {
-        int y, value;
-        y = m_lineHeight + ROW_SPACING;
-        value = this->verticalScrollBar()->value();
+        int value;
         if (e->angleDelta().y() > 0) {
-            value -= y;
-            if (value < 0) {
-                value = 0;
-            }
+            value = qMax(0, this->verticalScrollBar()->value() - 1);
         }else {
-            value += y;
-            if (value > this->verticalScrollBar()->maximum()) {
-                value = this->verticalScrollBar()->maximum();
-            }
+            value = qMin(this->verticalScrollBar()->maximum(), this->verticalScrollBar()->value() + 1);
         }
 
         this->verticalScrollBar()->setValue(value);
@@ -164,24 +154,26 @@ void HexView::wheelEvent(QWheelEvent *e)
 void HexView::mousePressEvent(QMouseEvent *e)
 {
     m_pos = e->pos();
-    e->ignore();
+    QAbstractScrollArea::mousePressEvent(e);
 }
 
 void HexView::mouseReleaseEvent(QMouseEvent *e)
 {
-    if (e->pos() == m_pos) {
+    if (e->pos() == m_pos && e->button() == Qt::LeftButton) {
         emit clicked(m_pos);
     }
 
-    e->ignore();
+    QAbstractScrollArea::mouseReleaseEvent(e);
 }
 
-void HexView::mouseDoubleClickEvent(QMouseEvent *)
+void HexView::mouseDoubleClickEvent(QMouseEvent *e)
 {
     if (!m_edit->isHidden()) {
         m_edit->selectAll();
         m_edit->setFocus();
     }
+
+    e->accept();
 }
 
 
@@ -198,8 +190,9 @@ void HexView::onEditingFinished()
 void HexView::onClicked(QPoint pos)
 {
     int row, col, span, limit;
-    col = pos.x() + this->horizontalScrollBar()->value();
     span = m_lineWidth / ROW_CHAR_COUNT;
+    col = pos.x() + this->horizontalScrollBar()->value() * span;
+
     m_editVisible = false;
     m_edit->setVisible(false);
     if (col > span * 10 && col < span * 58) {
@@ -211,11 +204,11 @@ void HexView::onClicked(QPoint pos)
     span = m_lineHeight + ROW_SPACING;
     row = pos.y() - span - ROW_SPACING;
     limit = qMin(this->viewport()->height() - span,
-               ((m_data.length() + 15) >> 4) * span - this->verticalScrollBar()->value()); //最大显示行结束坐标
+               (((m_data.length() + 15) >> 4)  - this->verticalScrollBar()->value()) * span); //最大显示行结束坐标
     limit -= limit % span;
 
     if (row > 0 && row < limit) {
-        row = (row + this->verticalScrollBar()->value()) / span;
+        row = row / span + this->verticalScrollBar()->value();
     }else {
         return;
     }
@@ -252,20 +245,22 @@ void HexView::setBusy(bool b)
 
 void HexView::adjustScrollRange()
 {
-    QFontMetrics fm(this->font());
-    int i, len, height;
+    int len, value;
     len = m_data.length();
-    i = (len >> 4) + ((len & 0x0F) ? 1 : 0) + 2; //数据行数
-    height = (m_lineHeight + ROW_SPACING) * i;
-    if (m_lineWidth > this->viewport()->width()) {
-        this->horizontalScrollBar()->setRange(0, m_lineWidth - this->viewport()->width());
-    }else {
-        this->horizontalScrollBar()->setRange(0, 0);
-    }
+    value = (len >> 4) + ((len & 0x0F) ? 1 : 0) + 1; //数据行数，额外增加1行：标题行
+    value = value - this->viewport()->height() / (m_lineHeight + ROW_SPACING); //1个单位代表1行
 
-    if (height > this->viewport()->height()) {
-        this->verticalScrollBar()->setRange(0, height - this->viewport()->height());
+    if (value > 0) {
+        this->verticalScrollBar()->setRange(0, value);
     }else {
         this->verticalScrollBar()->setRange(0, 0);
+    }
+
+    if (m_lineWidth > this->viewport()->width()) {
+        //1个单位代表1个字符
+        value = ROW_CHAR_COUNT - this->viewport()->width() / this->fontMetrics().horizontalAdvance('X');
+        this->horizontalScrollBar()->setRange(0, value);
+    }else {
+        this->horizontalScrollBar()->setRange(0, 0);
     }
 }

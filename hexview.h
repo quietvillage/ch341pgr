@@ -20,12 +20,12 @@ public:
     void setBusy(bool);
 
 protected:
-    void paintEvent(QPaintEvent *);
-    void resizeEvent(QResizeEvent *);
-    void wheelEvent(QWheelEvent *);
-    void mousePressEvent(QMouseEvent *);
-    void mouseReleaseEvent(QMouseEvent *);
-    void mouseDoubleClickEvent(QMouseEvent *);
+    virtual void paintEvent(QPaintEvent *) override;
+    virtual void resizeEvent(QResizeEvent *) override;
+    virtual void wheelEvent(QWheelEvent *) override;
+    virtual void mousePressEvent(QMouseEvent *) override;
+    virtual void mouseReleaseEvent(QMouseEvent *) override;
+    virtual void mouseDoubleClickEvent(QMouseEvent *) override;
 
 signals:
     void clicked(QPoint);

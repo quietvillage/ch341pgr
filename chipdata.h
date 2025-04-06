@@ -4,8 +4,9 @@
 #include <QStringList>
 
 // manufacturer ID
-#define SPI_WENDOR_ID_WINBOND   0xef
-#define SPI_WENDOR_ID_MXIC      0xc2
+#define SPI_WENDOR_ID_WINBOND       0xef
+#define SPI_WENDOR_ID_MXIC          0xc2
+#define SPI_WENDOR_ID_GIGADEVICE    0xC8
 
 #define SPI_MAX_PAGE_PRAGRAM_SIZE 256
 

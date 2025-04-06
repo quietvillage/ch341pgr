@@ -27,6 +27,7 @@ public:
 
 protected:
     void resizeEvent(QResizeEvent *e);
+    bool eventFilter(QObject *sender, QEvent *e);
 
 private slots:
     void on_action_open_triggered();

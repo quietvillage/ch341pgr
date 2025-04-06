@@ -10,9 +10,6 @@
     <height>600</height>
    </rect>
   </property>
-  <property name="windowTitle">
-   <string>ch341pgr</string>
-  </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QWidget" name="horizontalLayoutWidget">
     <property name="geometry">
@@ -81,6 +78,11 @@
         <item>
          <property name="text">
           <string>MXIC</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>GigaDevice</string>
          </property>
         </item>
         <item>
@@ -368,7 +370,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>27</height>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">

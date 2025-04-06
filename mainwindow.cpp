@@ -7,6 +7,7 @@
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QResizeEvent>
+#include <QMimeData>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -29,6 +30,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->centralwidget->setLayout(ui->hLayout);
     ui->progressBar->setParent(ui->hexView);
     ui->progressBar->setVisible(false);
+    ui->hexView->setAcceptDrops(true);
+    ui->hexView->installEventFilter(this);
 
     connect(ui->btn_open, SIGNAL(clicked()), this, SLOT(on_action_open_triggered()));
     connect(ui->btn_save, SIGNAL(clicked()), this, SLOT(on_action_save_triggered()));
@@ -52,6 +55,39 @@ void MainWindow::resizeEvent(QResizeEvent *e)
     if (e != nullptr) {
         e->ignore();
     }
+}
+
+bool MainWindow::eventFilter(QObject *sender, QEvent *e)
+{
+    if (sender == ui->hexView) {
+        if (e->type() == QEvent::DragEnter) {
+            QDragEnterEvent *event = static_cast<QDragEnterEvent *>(e);
+            if(event->mimeData()->hasUrls()) {
+                event->acceptProposedAction();
+            }
+
+            return true;
+        }else if (e->type() == QEvent::Drop) {
+            const QMimeData *data = static_cast<QDropEvent *>(e)->mimeData();
+            if (data->hasFormat("text/uri-list")) {
+                QString fileName = data->urls().at(0).toLocalFile();
+                QFile file(fileName);
+                if (!file.open(QIODevice::ReadOnly)) {
+                    QMessageBox::critical(this, tr("错误"), tr("无法打开文件“%1”").arg(fileName), tr("确定"));
+                    return true;
+                }
+
+                ui->hexView->setData(file.readAll());
+                file.close();
+                m_file = fileName;
+                ui->statusbar->showMessage(tr("已选择文件“%1”").arg(m_file), 3000);
+            }
+
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void MainWindow::onloaded()
@@ -169,8 +205,9 @@ void MainWindow::on_btn_detect_clicked()
     QByteArray info = m_port.spiJedecId();
     if (info.length() >= 3) {
         switch ((uchar)info.at(0)) {
-        case 0xEF: ui->combo_vendor->setCurrentText(tr("Winbond")); break;
-        case 0xC2: ui->combo_vendor->setCurrentText(tr("MXIC")); break;
+        case SPI_WENDOR_ID_WINBOND: ui->combo_vendor->setCurrentText(tr("Winbond")); break;
+        case SPI_WENDOR_ID_MXIC: ui->combo_vendor->setCurrentText(tr("MXIC")); break;
+        case SPI_WENDOR_ID_GIGADEVICE: ui->combo_vendor->setCurrentText(tr("GigaDevice")); break;
         default: ui->combo_vendor->setCurrentText(tr("未知")); break;
         }
 
@@ -252,6 +289,7 @@ void MainWindow::initModel()
     }
 }
 
+//设备进入或退出忙状态时，需要阻止或恢复的操作
 void MainWindow::blockActions(bool block)
 {
     block = !block;
@@ -265,6 +303,7 @@ void MainWindow::blockActions(bool block)
     ui->action_open->setEnabled(block);
     ui->btn_cropping->setEnabled(block);
     ui->action_cropping->setEnabled(block);
+    ui->hexView->setAcceptDrops(block);
 }
 
 void MainWindow::on_btn_checkEmpty_clicked()
