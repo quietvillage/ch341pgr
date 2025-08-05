@@ -1,8 +1,12 @@
                         ch341pgr 编程器
 
 本程序是一个在 linux 环境下使用的 flash 烧录器，适用于沁恒 CH341A/B 系列芯片硬件编程器。
-是一个刷 BIOS (SPI Nor Flash) 的小工具，基于 libusb 驱动，稳定高效易用
-支持 24、25 系列存储器烧写
+是一个刷 BIOS (SPI Nor Flash) 的小工具。
+支持 ATMEL 24、Winbond/GigaDevice 25 系列存储器烧写（虽说多数厂商指令是兼容的，
+但手头没有其他厂商的芯片，未经测试，所以不确定可不可以）
+
+此程序采用 libusb 驱动代替 CH341 芯片的官方驱动，所以可以省去编译加载驱动的繁琐步骤，
+大大提高了易用性。
 
 
 编译：
@@ -11,7 +15,10 @@
 用 Qt Creator 打开工程，选择 Release 编译。
 
 
-
+Windows用户注意：
+Windows 系统需要安装 WinUSB 驱动来支持 libusb-1.0，所以：
+使用前需卸载 CH341 并行驱动（如果已经安装了的话）
+再使用 Zadig（下载网址 https://zadig.akeo.ie/）安装 WinUSB 驱动
 
 
 

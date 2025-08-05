@@ -8,16 +8,21 @@
 #include <QScrollBar>
 #include <QResizeEvent>
 #include <QMimeData>
+#include <QElapsedTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_croppingDialog(nullptr)
+    , m_language(LANGUAGE_zh_CN)
+#if defined (Q_OS_LINUX)
     , m_uid(0)
+#endif
+    , m_cancel(false)
 {
     ui->setupUi(this);
     this->setWindowTitle(QString("ch341pgr - v%1").arg(CH341PGR_VERSION_STRING));
-    this->setWindowIcon(QIcon(":logo.png"));
+    this->setWindowIcon(QIcon(":logo.ico"));
     QFont font = this->font();
     font.setPointSizeF(10.5);
     this->setFont(font);
@@ -93,6 +98,68 @@ bool MainWindow::eventFilter(QObject *sender, QEvent *e)
 void MainWindow::onloaded()
 {
     this->resizeEvent(nullptr);
+    this->loadSettings();
+    connect(ui->combo_memType, SIGNAL(currentIndexChanged(int)), this, SLOT(saveSettings()));
+    connect(ui->combo_vendor, SIGNAL(currentIndexChanged(int)), this, SLOT(saveSettings()));
+    connect(ui->combo_model, SIGNAL(currentIndexChanged(int)), this, SLOT(saveSettings()));
+}
+
+void MainWindow::saveSettings()
+{
+    QFile file(qApp->applicationDirPath() + "/settings");
+    if (file.open(QIODevice::Truncate | QIODevice::WriteOnly)) {
+        QString text = QString("memoryType=%1").arg(ui->combo_memType->currentIndex());
+        text += QString("\nmanufacturer=%1").arg(ui->combo_vendor->currentIndex());
+        text += QString("\nmodel=%1").arg(ui->combo_model->currentIndex());
+        text += QString("\nlanguage=%1").arg(m_language);
+        
+        file.write(text.toUtf8());
+        file.close();
+
+#if defined (Q_OS_LINUX)
+        if (getuid() != m_uid) { //非root用户
+            chown(file.fileName().toLocal8Bit(), m_uid, m_gid);
+        }
+#endif
+    }
+}
+
+
+void MainWindow::loadSettings()
+{
+    QFile file(qApp->applicationDirPath() + "/settings");
+    if (file.open(QIODevice::ReadOnly)) {
+        QString option, value;
+        int i;
+        
+        while (!file.atEnd()) {
+            option = QString::fromUtf8(file.readLine()).replace("\n", "");
+            option.replace("\r", "");
+            if ("" != option.trimmed()) {
+                i = option.indexOf('=');
+                if (i < 0 || '#' == option.at(0)) {
+                    continue;
+                }
+                
+                value = option.mid(i + 1).trimmed();
+                option = option.left(i).trimmed();
+                
+                if ("memoryType" == option) {
+                    ui->combo_memType->setCurrentIndex(value.toInt());
+                }else if ("manufacturer" == option) {
+                    ui->combo_vendor->setCurrentIndex(value.toInt());
+                }else if ("model" == option) {
+                    ui->combo_model->setCurrentIndex(value.toInt());
+                }else if ("language" == option) {
+                    if (LANGUAGE_en_US == value.toInt()) {
+                        this->on_action_select_en_triggered();
+                    }
+                }
+            }
+        }
+        
+        file.close();
+    }
 }
 
 void MainWindow::on_action_open_triggered()
@@ -135,9 +202,11 @@ void MainWindow::on_action_save_triggered()
     ui->hexView->setBusy(false);
     file.close();
 
+#if defined (Q_OS_LINUX)
     if (getuid() != m_uid) { //非root用户
         chown(fileName.toLocal8Bit(), m_uid, m_gid);
     }
+#endif
 
     QMessageBox::information(this, tr("提示"), tr("保存完成"), tr("确定"));
 }
@@ -152,9 +221,10 @@ void MainWindow::on_action_quit_triggered()
 void MainWindow::on_btn_flush_clicked()
 {
     QStringList portList;
-    int ret, i, count;
     ui->combo_ports->clear();
     m_portList.clear();
+
+    int ret, i, count;
     ret = libusb_init(nullptr);
     if (ret < 0) {
         return;
@@ -203,11 +273,12 @@ void MainWindow::on_btn_detect_clicked()
     }
 
     QByteArray info = m_port.spiJedecId();
+    
     if (info.length() >= 3) {
         switch ((uchar)info.at(0)) {
-        case SPI_WENDOR_ID_WINBOND: ui->combo_vendor->setCurrentText(tr("Winbond")); break;
-        case SPI_WENDOR_ID_MXIC: ui->combo_vendor->setCurrentText(tr("MXIC")); break;
-        case SPI_WENDOR_ID_GIGADEVICE: ui->combo_vendor->setCurrentText(tr("GigaDevice")); break;
+        case SPI_VENDOR_ID_WINBOND: ui->combo_vendor->setCurrentText(tr("Winbond")); break;
+        case SPI_VENDOR_ID_MXIC: ui->combo_vendor->setCurrentText(tr("MXIC")); break;
+        case SPI_VENDOR_ID_GIGADEVICE: ui->combo_vendor->setCurrentText(tr("GigaDevice")); break;
         default: ui->combo_vendor->setCurrentText(tr("未知")); break;
         }
 
@@ -215,15 +286,25 @@ void MainWindow::on_btn_detect_clicked()
                                 + "  0x" + QString("%1").arg((uchar)info.at(1), 2, 16, QLatin1Char('0')).toUpper()
                                 + "  0x" + QString("%1").arg((uchar)info.at(2), 2, 16, QLatin1Char('0')).toUpper()
                                 );
-
-        if ((uchar)info.at(2) >= 0x11 && (uchar)info.at(2) <= 0x1B) {
-            if ((uchar)info.at(2) < 0x14) {
-                ui->label_size->setText(tr("容量： %1KBytes").arg(1 << ((uchar)info.at(2) - 0x11 + 7)));
+        
+        int temp = (uchar)info.at(2);
+        if ((uchar)info.at(0) == SPI_VENDOR_ID_WINBOND)
+        {
+            if (temp >= 0x20 && temp <= 0x22) {
+                temp = temp - 0x20 + 0x1A; //winbound使用的是BCD码形式
+            }
+        }else {
+            temp = (temp & 0x0F) | 0x10;
+        }
+        
+        if (temp >= 0x10 && temp <= 0x1C) {
+            if (temp < 0x14) {
+                ui->label_size->setText(tr("容量： %1KBytes").arg(1 << (temp - 0x10 + 6)));
             }else {
-                ui->label_size->setText(tr("容量： %1MBytes").arg(1 << ((uchar)info.at(2) - 0x14)));
+                ui->label_size->setText(tr("容量： %1MBytes").arg(1 << (temp - 0x14)));
             }
 
-            ui->combo_model->setCurrentIndex((uchar)info.at(2) - 0x10);
+            ui->combo_model->setCurrentIndex(temp - 0x10 + 1);
         }else {
             ui->label_size->setText(tr("容量：(未知)"));
             ui->combo_model->setCurrentIndex(0);
@@ -236,6 +317,12 @@ void MainWindow::on_btn_detect_clicked()
 
     m_port.closeDevice();
 }
+
+void MainWindow::on_btn_cancel_clicked()
+{
+    m_cancel = true;
+}
+
 
 void MainWindow::on_btn_erase_clicked()
 {
@@ -265,7 +352,7 @@ void MainWindow::on_btn_erase_clicked()
 }
 
 //返回 0 - 未指定型号
-int MainWindow::chipSize()
+int64_t MainWindow::chipSize()
 {
     int i = ui->combo_model->currentIndex();
     if (!i) {
@@ -274,7 +361,7 @@ int MainWindow::chipSize()
     }
 
     if (ui->combo_memType->currentIndex() == 0) {
-        return 1024 * 128 * (1 << (i - 1));
+        return 1024L * 64 * (1 << (i - 1));
     }else {
         return 128 * (1 << (i - 1));
     }
@@ -292,6 +379,8 @@ void MainWindow::initModel()
 //设备进入或退出忙状态时，需要阻止或恢复的操作
 void MainWindow::blockActions(bool block)
 {
+    ui->btn_cancel->setEnabled(block);
+    m_cancel = false; //开始与结束状态皆为false
     block = !block;
     ui->btn_read->setEnabled(block);
     ui->btn_write->setEnabled(block);
@@ -308,11 +397,16 @@ void MainWindow::blockActions(bool block)
 
 void MainWindow::on_btn_checkEmpty_clicked()
 {
-    int size, j, step = CH341_MAX_BUF_LEN; //一次读取 4KB
+    QElapsedTimer timer;
+    timer.start();
+    ui->statusbar->showMessage("");
+    
+    int64_t size, i;
+    int j, step = CH341_MAX_BUF_LEN; //一次读取 4KB
     if (!(size = this->chipSize())) {return;}
 
     this->initModel();
-    int i = m_port.openDevice();
+    i = m_port.openDevice();
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
         return;
@@ -326,6 +420,10 @@ void MainWindow::on_btn_checkEmpty_clicked()
     int errCount = 0;
     i = 0;
     while (i < size) {
+        if (m_cancel) {
+            goto final;
+        }
+        
         if (size - i < step) {
             step = size - i;
         }
@@ -350,7 +448,12 @@ void MainWindow::on_btn_checkEmpty_clicked()
         ui->progressBar->setValue(i * 100 / size);
         QApplication::processEvents();
     }
-
+    
+    ui->statusbar->showMessage(tr("检查完成！用时 %1 分 %2.%3 秒")
+                                   .arg(timer.elapsed() / 1000 / 60)
+                                   .arg(timer.elapsed() / 1000 % 60)
+                                   .arg(timer.elapsed() % 1000));
+    ui->statusbar->repaint();
     QMessageBox::information(this, tr("提示"), tr("存储器内容是空的"), tr("确定"));
 
 final:
@@ -362,12 +465,17 @@ final:
 
 void MainWindow::on_btn_read_clicked()
 {
+    QElapsedTimer timer;
+    timer.start();
+    ui->statusbar->showMessage("");
+    
     QByteArray buffer;
-    int size, step = CH341_MAX_BUF_LEN; //一次读取 4KB
+    int64_t size, i;
+    int step = CH341_MAX_BUF_LEN; //一次读取 4KB
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
-    int i = m_port.openDevice();
+    i = m_port.openDevice();
 
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
@@ -383,6 +491,10 @@ void MainWindow::on_btn_read_clicked()
     int errCount = 0;
     i = 0;
     while (i < size) {
+        if (m_cancel) {
+            goto final;
+        }
+        
         if (size - i < step) {
             step = size - i;
         }
@@ -403,6 +515,11 @@ void MainWindow::on_btn_read_clicked()
     }
 
     ui->hexView->setData(buffer);
+    ui->statusbar->showMessage(tr("读取完成！用时 %1 分 %2.%3 秒")
+                                   .arg(timer.elapsed() / 1000 / 60)
+                                   .arg(timer.elapsed() / 1000 % 60)
+                                   .arg(timer.elapsed() % 1000));
+    ui->statusbar->repaint();
 
 final:
     m_port.closeDevice();
@@ -413,16 +530,21 @@ final:
 
 void MainWindow::on_btn_write_clicked()
 {
+    QElapsedTimer timer;
+    timer.start();
+    ui->statusbar->showMessage("");
+    
     if (!ui->hexView->data().length()) {
         QMessageBox::information(this, tr("提示"), tr("缓冲区没有内容"), tr("确定"));
         return;
     }
 
-    int size, step = CH341_MAX_BUF_LEN; // CH341_MAX_BUF_LEN = sector size = 4KB
+    int64_t size, i;
+    int sub, step = CH341_MAX_BUF_LEN; // CH341_MAX_BUF_LEN = sector size = 4KB
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
-    int i = m_port.openDevice(), sub;
+    i = m_port.openDevice();
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
         return;
@@ -443,6 +565,10 @@ void MainWindow::on_btn_write_clicked()
     int errCount = 0;
     i = 0;
     while (i < size) {
+        if (m_cancel) {
+            goto final;
+        }
+        
         if (step > size - i) {
             step = size - i;
         }
@@ -463,7 +589,12 @@ void MainWindow::on_btn_write_clicked()
         ui->progressBar->setValue(i * 100 / size);
         QApplication::processEvents();
     }
-
+    
+    ui->statusbar->showMessage(tr("写入完成！用时 %1 分 %2.%3 秒")
+                                   .arg(timer.elapsed() / 1000 / 60)
+                                   .arg(timer.elapsed() / 1000 % 60)
+                                   .arg(timer.elapsed() % 1000));
+    ui->statusbar->repaint();
     QMessageBox::information(this, tr("提示"), tr("写入完成"), tr("确定"));
     if (ui->hexView->data().length() > size) {
         ui->hexView->setData(ui->hexView->data().left(size));
@@ -479,17 +610,22 @@ final:
 
 void MainWindow::on_btn_check_clicked()
 {
+    QElapsedTimer timer;
+    timer.start();
+    ui->statusbar->showMessage("");
+    
     if (!ui->hexView->data().length()) {
         QMessageBox::information(this, tr("提示"), tr("缓冲区没有内容"), tr("确定"));
         return;
     }
 
-    int size, step = CH341_MAX_BUF_LEN, //一次读取 4KB
-       len = ui->hexView->data().length();
+    int64_t size, i, len;
+    int step = CH341_MAX_BUF_LEN; //一次读取 4KB
+    len = ui->hexView->data().length();
     if (!(size = this->chipSize())) {return;}
     this->initModel();
 
-    int i = m_port.openDevice();
+    i = m_port.openDevice();
     if (!i) {
         QMessageBox::critical(this, tr("错误"), m_port.errorMessage(), tr("确定"));
         return;
@@ -504,6 +640,10 @@ void MainWindow::on_btn_check_clicked()
     int errCount = 0;
     i = 0;
     while (i < len) {
+        if (m_cancel) {
+            goto final;
+        }
+        
         if (len - i < step) {
             step = len - i;
         }
@@ -552,7 +692,12 @@ void MainWindow::on_btn_check_clicked()
         ui->progressBar->setValue(i * 100 / size);
         QApplication::processEvents();
     }
-
+    
+    ui->statusbar->showMessage(tr("校验完成！用时 %1 分 %2.%3 秒")
+                                   .arg(timer.elapsed() / 1000 / 60)
+                                   .arg(timer.elapsed() / 1000 % 60)
+                                   .arg(timer.elapsed() % 1000));
+    ui->statusbar->repaint();
     QMessageBox::information(this, tr("提示"), tr("校验完成，内容一致"), tr("确定"));
 
 final:
@@ -579,6 +724,8 @@ void MainWindow::onPortChanged(int index)
 void MainWindow::on_action_select_zh_CN_triggered()
 {
     QApplication::removeTranslator(&m_translator);
+    m_language = LANGUAGE_zh_CN;
+    this->saveSettings();
     ui->retranslateUi(this);
 }
 
@@ -586,6 +733,8 @@ void MainWindow::on_action_select_zh_CN_triggered()
 void MainWindow::on_action_select_en_triggered()
 {
     QApplication::installTranslator(&m_translator);
+    m_language = LANGUAGE_en_US;
+    this->saveSettings();
     ui->retranslateUi(this);
 }
 

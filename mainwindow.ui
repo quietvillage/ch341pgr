@@ -16,7 +16,7 @@
      <rect>
       <x>50</x>
       <y>10</y>
-      <width>666</width>
+      <width>767</width>
       <height>401</height>
      </rect>
     </property>
@@ -304,6 +304,16 @@
           </spacer>
          </item>
          <item>
+          <widget class="QPushButton" name="btn_cancel">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>取消</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="btn_erase">
            <property name="enabled">
             <bool>true</bool>
@@ -370,7 +380,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>25</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">

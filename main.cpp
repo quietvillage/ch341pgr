@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 #include <QApplication>
+
+#if defined(Q_OS_LINUX)
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QProcess>
@@ -7,14 +9,15 @@
 #include <QSharedMemory>
 #include <QTime>
 #include <unistd.h>
-#include <iostream>
+//#include <iostream>
+#endif
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-
     MainWindow w;
 
+#if defined (Q_OS_LINUX)
     if (getuid() != 0) {
         //随机生成一个key
         QString key = QString("ch341pgr%1").arg(
@@ -118,6 +121,7 @@ int main(int argc, char *argv[])
             w.setGid(QString(argv[4]).toUInt());
         }
     }
+#endif
 
     w.show();
     w.onloaded();

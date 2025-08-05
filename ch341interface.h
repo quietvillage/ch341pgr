@@ -9,6 +9,7 @@
 #include <QString>
 #include <QPair>
 
+
 #define CH341_VENDOR_ID     0x1A86
 #define CH341_PRODUCT_ID    0x5512
 
@@ -90,6 +91,8 @@ private:
     inline QByteArray spiGetStatusPrivate(uchar cmd);
     bool spiWriteEnablePrivate();
     bool spiWaitPrivate();
+    bool spiEnter4ByteAddrModePrivate(); //容量大于或等于 256Mb 的 Nor Flash
+    bool spiExit4ByteAddrModePrivate();
 
     QByteArray spiReadPrivate(uint n, uint addr);
     int spiWritePrivate(const QByteArray &in, uint addr);

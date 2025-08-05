@@ -5,6 +5,7 @@ const QList<QStringList> chipModelLists = {
     //25 SPI Flash
     {
         QObject::tr("未知"),
+        "25x512(512Kb)",
         "25x10",
         "25x20",
         "25x40",
@@ -15,7 +16,8 @@ const QList<QStringList> chipModelLists = {
         "25x128",
         "25x256",
         "25x512",
-        "25x01"
+        "25x01(1Gb)",
+        "25x02(2Gb)"
     },
 
     //24 EEPROM

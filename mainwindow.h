@@ -5,7 +5,13 @@
 #include "croppingdialog.h"
 #include <QMainWindow>
 #include <QTranslator>
+
+ #if defined (Q_OS_LINUX)
 #include <unistd.h>
+#endif
+
+#define LANGUAGE_zh_CN  0
+#define LANGUAGE_en_US  1
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -20,16 +26,21 @@ public:
     ~MainWindow();
 
     void onloaded();
+    void loadSettings();
+
+ #if defined (Q_OS_LINUX)
     QString homeDir() {return m_homeDir;}
     void setHomeDir(const QString &dir) {m_homeDir = dir;}
     void setUid(uid_t id) {m_uid = id;}
     void setGid(uid_t id) {m_gid = id;}
+#endif
 
 protected:
     void resizeEvent(QResizeEvent *e);
     bool eventFilter(QObject *sender, QEvent *e);
 
 private slots:
+    void saveSettings();
     void on_action_open_triggered();
 
     void on_action_save_triggered();
@@ -37,6 +48,8 @@ private slots:
     void on_action_quit_triggered();
 
     void on_btn_flush_clicked();
+    
+    void on_btn_cancel_clicked();
 
     void on_btn_erase_clicked();
 
@@ -62,10 +75,10 @@ private slots:
     void onChopRequest(char); //删除尾部特定值
     void onCroppingRequest(int, int);
     void onModelChanged(int index);
-
-
+    
+    
 private:
-    int chipSize();
+    int64_t chipSize();
     void initModel();
     void blockActions(bool block);
 
@@ -75,8 +88,14 @@ private:
     Ch341Interface m_port;
     QString m_file;
     QString m_homeDir;
-    QList<QPair<int, int>> m_portList;
+    QList<QPair<int, int>> m_portList; //<bus, port>
+    int m_language;
+
+#if defined (Q_OS_LINUX)
     uid_t m_uid; //user id
     uid_t m_gid; //group id
+#endif
+    
+    bool m_cancel;
 };
 #endif // MAINWINDOW_H

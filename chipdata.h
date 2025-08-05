@@ -4,9 +4,9 @@
 #include <QStringList>
 
 // manufacturer ID
-#define SPI_WENDOR_ID_WINBOND       0xef
-#define SPI_WENDOR_ID_MXIC          0xc2
-#define SPI_WENDOR_ID_GIGADEVICE    0xC8
+#define SPI_VENDOR_ID_WINBOND       0xef
+#define SPI_VENDOR_ID_MXIC          0xc2
+#define SPI_VENDOR_ID_GIGADEVICE    0xC8
 
 #define SPI_MAX_PAGE_PRAGRAM_SIZE 256
 
@@ -29,7 +29,10 @@
 #define SPI_CMD_JEDEC_ID        0x9f    // JEDEC standard compatible ID
 #define SPI_CMD_RESET_ENABLE    0x66
 #define SPI_CMD_RESET           0x99
+#define SPI_CMD_ENTER_4BYTE_ADDR_MODE   0xB7
+#define SPI_CMD_EXIT_4BYTE_ADDR_MODE    0xE9
 
+#define SPI_FLASH_MODEL_INDEX_25Q256    10
 
 #define EEPROM_MODEL_INDEX_24C01    1
 #define EEPROM_MODEL_INDEX_24C02    2
